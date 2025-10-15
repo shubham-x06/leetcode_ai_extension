@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "LeetCode AI Hints",
+  "version": "1.0.0",
+  "description": "Get AI-powered hints and code verification on LeetCode without revealing the full solution.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.leetcode.com/problems/*"
+  ],
+  "action": {
+    "default_icon": { "16": "icons/icon16.png" },
+    "default_title": "LeetCode AI Hints"
+  },
+  "icons": { "16": "icons/icon16.png" },
+  "content_scripts": [
+    {
+      "matches": [ "*://*.leetcode.com/problems/*" ],
+      "js": [ "content_script.js" ],
+      "css": [ "widget.css" ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [ "widget.html" ],
+      "matches": [ "*://*.leetcode.com/*" ]
+    }
+  ]
+}
