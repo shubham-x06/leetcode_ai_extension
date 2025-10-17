@@ -5,6 +5,71 @@
     return;
   }
 
+  // Function to detect the current programming language
+  function getCurrentLanguage() {
+    const languages = ['C++', 'Java', 'Python', 'Python3', 'C', 'C#', 'JavaScript', 
+                      'TypeScript', 'Ruby', 'Swift', 'Go', 'Scala', 'Kotlin', 
+                      'Rust', 'PHP', 'Dart', 'Racket', 'Erlang', 'Elixir'];
+    
+    // // Method 1: Find buttons that are likely language selectors
+    // const buttons = document.querySelectorAll('button');
+    // for (const button of buttons) {
+    //   const text = button.textContent.trim();
+    //   // Must be EXACT match to a language name (not contain, must equal)
+    //   if (languages.includes(text)) {
+    //     const rect = button.getBoundingClientRect();
+    //     // Must be in top area and visible
+    //     if (rect.top < 400 && rect.top > 0 && button.offsetParent !== null) {
+    //       console.log("Found language via button (exact match):", text);
+    //       return text;
+    //     }
+    //   }
+    // }
+
+    
+
+    // // Method 3: Look for very specific small buttons/spans near top
+    // const smallElements = document.querySelectorAll('button span, button, [role="button"]');
+    // for (const element of smallElements) {
+    //   const text = element.textContent.trim();
+    //   // STRICT: text must be ONLY a language name, nothing extra
+    //   if (languages.includes(text) && text.length < 15) {
+    //     const rect = element.getBoundingClientRect();
+    //     if (rect.top < 300 && rect.top > 50 && element.offsetParent !== null) {
+    //       console.log("Found language via small element:", text);
+    //       return text;
+    //     }
+    //   }
+    // }
+
+    // Method 4: Try to find the Monaco editor language indicator
+    const monacoLang = document.querySelector('.monaco-editor')?.getAttribute('data-mode-id');
+    if (monacoLang) {
+      const langMap = {
+        'cpp': 'C++',
+        'java': 'Java',
+        'python': 'Python',
+        'javascript': 'JavaScript',
+        'typescript': 'TypeScript',
+        'csharp': 'C#',
+        'go': 'Go',
+        'rust': 'Rust',
+        'swift': 'Swift',
+        'kotlin': 'Kotlin',
+        'ruby': 'Ruby',
+        'scala': 'Scala',
+        'php': 'PHP',
+      };
+      if (langMap[monacoLang]) {
+        console.log("Found language via Monaco editor:", langMap[monacoLang]);
+        return langMap[monacoLang];
+      }
+    }
+
+    console.log("Could not detect language, defaulting to C++");
+    return "C++";
+  }
+
   // Function to get code from the LeetCode editor
   function getCodeFromEditor() {
     const codeLineElements = document.querySelectorAll('.view-lines .view-line');
@@ -93,10 +158,15 @@
         // Get user code
         const userCode = getCodeFromEditor();
 
+        // Get current language
+        const language = getCurrentLanguage();
+
         console.log("--- Problem Description ---");
         console.log(problemDescription);
         console.log("\n--- User Code ---");
         console.log(userCode);
+        console.log("\n--- Language ---");
+        console.log(language);
 
         // Show loading message
         if (chatHistoryDiv) {
@@ -112,7 +182,8 @@
             },
             body: JSON.stringify({
               problemDescription,
-              userCode
+              userCode,
+              language
             })
           });
 
@@ -149,7 +220,11 @@
         // Get user code
         const userCode = getCodeFromEditor();
 
+        // Get current language
+        const language = getCurrentLanguage();
+
         console.log("--- Requesting Solution ---");
+        console.log("Language:", language);
 
         // Show loading message
         if (chatHistoryDiv) {
@@ -165,7 +240,8 @@
             },
             body: JSON.stringify({
               problemDescription,
-              userCode
+              userCode,
+              language
             })
           });
 
@@ -176,7 +252,7 @@
             if (chatHistoryDiv) {
               // Format the solution with proper line breaks and code formatting
               const formattedSolution = solution.replace(/\n/g, '<br>');
-              chatHistoryDiv.innerHTML = `<div class="hint-message"><strong>AI Solution:</strong><br><br>${formattedSolution}</div>`;
+              chatHistoryDiv.innerHTML = `<div class="hint-message"><strong>AI Solution (${language}):</strong><br><br>${formattedSolution}</div>`;
             }
           } else {
             if (chatHistoryDiv) {
