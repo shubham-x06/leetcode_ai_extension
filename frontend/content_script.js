@@ -11,61 +11,20 @@
                       'TypeScript', 'Ruby', 'Swift', 'Go', 'Scala', 'Kotlin', 
                       'Rust', 'PHP', 'Dart', 'Racket', 'Erlang', 'Elixir'];
     
-    // // Method 1: Find buttons that are likely language selectors
-    // const buttons = document.querySelectorAll('button');
-    // for (const button of buttons) {
-    //   const text = button.textContent.trim();
-    //   // Must be EXACT match to a language name (not contain, must equal)
-    //   if (languages.includes(text)) {
-    //     const rect = button.getBoundingClientRect();
-    //     // Must be in top area and visible
-    //     if (rect.top < 400 && rect.top > 0 && button.offsetParent !== null) {
-    //       console.log("Found language via button (exact match):", text);
-    //       return text;
-    //     }
-    //   }
-    // }
-
-    
-
-    // // Method 3: Look for very specific small buttons/spans near top
-    // const smallElements = document.querySelectorAll('button span, button, [role="button"]');
-    // for (const element of smallElements) {
-    //   const text = element.textContent.trim();
-    //   // STRICT: text must be ONLY a language name, nothing extra
-    //   if (languages.includes(text) && text.length < 15) {
-    //     const rect = element.getBoundingClientRect();
-    //     if (rect.top < 300 && rect.top > 50 && element.offsetParent !== null) {
-    //       console.log("Found language via small element:", text);
-    //       return text;
-    //     }
-    //   }
-    // }
-
-    // Method 4: Try to find the Monaco editor language indicator
-    const monacoLang = document.querySelector('.monaco-editor')?.getAttribute('data-mode-id');
-    if (monacoLang) {
-      const langMap = {
-        'cpp': 'C++',
-        'java': 'Java',
-        'python': 'Python',
-        'javascript': 'JavaScript',
-        'typescript': 'TypeScript',
-        'csharp': 'C#',
-        'go': 'Go',
-        'rust': 'Rust',
-        'swift': 'Swift',
-        'kotlin': 'Kotlin',
-        'ruby': 'Ruby',
-        'scala': 'Scala',
-        'php': 'PHP',
-      };
-      if (langMap[monacoLang]) {
-        console.log("Found language via Monaco editor:", langMap[monacoLang]);
-        return langMap[monacoLang];
+    // Method 1: Find buttons that are likely language selectors
+    const buttons = document.querySelectorAll('button');
+    for (const button of buttons) {
+      const text = button.textContent.trim();
+      // Must be EXACT match to a language name (not contain, must equal)
+      if (languages.includes(text)) {
+        const rect = button.getBoundingClientRect();
+        // Must be in top area and visible
+        if (rect.top < 400 && rect.top > 0 && button.offsetParent !== null) {
+          console.log("Found language via button (exact match):", text);
+          return text;
+        }
       }
     }
-
     console.log("Could not detect language, defaulting to C++");
     return "C++";
   }
