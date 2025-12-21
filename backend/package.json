@@ -1,15 +1,15 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "LeetCode AI extension backend server to handle AI hints and code verification. Built with Express and OpenAI API.",
   "main": "index.js",
     "scripts": {
   "test": "echo \"Error: no test specified\" && exit 1",
   "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/index.ts"
 },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["leetcode","extension","ai"],
+  "author": "Shubham Mittal <shubhammittal0610@gmail.com>",
+  "license": "Apache-2.0",
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

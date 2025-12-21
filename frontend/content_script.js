@@ -38,6 +38,15 @@
     return Array.from(codeLineElements).map(line => line.textContent).join('\n');
   }
 
+  // Function to copy text to clipboard
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      console.log('Solution copied to clipboard!');
+    }).catch(err => {
+      console.error('Failed to copy:', err);
+    });
+  }
+
   // Create and inject the widget
   const widgetContainer = document.createElement('div');
   widgetContainer.id = 'ai-hint-widget-container';
@@ -211,7 +220,51 @@
             if (chatHistoryDiv) {
               // Format the solution with proper line breaks and code formatting
               const formattedSolution = solution.replace(/\n/g, '<br>');
-              chatHistoryDiv.innerHTML = `<div class="hint-message"><strong>AI Solution (${language}):</strong><br><br>${formattedSolution}</div>`;
+              
+              // Create copy button
+              const copyButtonHtml = `
+                <button id="copy-solution-btn" style="
+                  background-color: #b8bb26;
+                  color: #282828;
+                  border: none;
+                  padding: 6px 10px;
+                  border-radius: 4px;
+                  cursor: pointer;
+                  font-size: 11px;
+                  transition: background-color 0.2s;
+                  font-weight: bold;
+                  float: right;
+                  margin-left: 10px;
+                " onmouseover="this.style.backgroundColor='#98971a'" 
+                   onmouseout="this.style.backgroundColor='#b8bb26'">
+                  📋 Copy
+                </button>
+              `;
+              
+              chatHistoryDiv.innerHTML = `
+                <div class="hint-message">
+                  <div style="margin-bottom: 10px;">
+                    <strong>AI Solution (${language}):</strong>
+                    ${copyButtonHtml}
+                  </div>
+                  <div style="clear: both;"></div>
+                  ${formattedSolution}
+                </div>
+              `;
+              
+              // Add event listener to copy button
+              const copyBtn = chatHistoryDiv.querySelector('#copy-solution-btn');
+              if (copyBtn) {
+                copyBtn.addEventListener('click', () => {
+                  copyToClipboard(solution);
+                  copyBtn.textContent = '✓ Copied';
+                  copyBtn.style.backgroundColor = '#689d6a';
+                  setTimeout(() => {
+                    copyBtn.textContent = '📋 Copy';
+                    copyBtn.style.backgroundColor = '#b8bb26';
+                  }, 2000);
+                });
+              }
             }
           } else {
             if (chatHistoryDiv) {

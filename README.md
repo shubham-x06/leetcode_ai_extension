@@ -1,14 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
 ##  Setup and Run
 
 Here's how you can get the project running on your own computer.
