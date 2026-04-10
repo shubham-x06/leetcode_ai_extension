@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Types } from 'mongoose';
 import { AppError } from '../errors/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
 import { validateBody } from '../middleware/validate';
@@ -13,7 +14,7 @@ import { extractWeakestTopicsByProblemsSolved } from '../services/weakTopics';
 
 export const userRouter = Router();
 
-async function requireLeetcodeUsername(userId: string): Promise<string> {
+async function requireLeetcodeUsername(userId: Types.ObjectId): Promise<string> {
   const u = await User.findById(userId).lean();
   const n = u?.leetcodeUsername?.trim();
   if (!n) {

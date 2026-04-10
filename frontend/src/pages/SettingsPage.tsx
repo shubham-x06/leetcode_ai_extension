@@ -3,7 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { api } from '../lib/api';
-import { useSessionStore, type SessionUser } from '../store/sessionStore';
+import { useSessionStore, type SessionUser, type UserPreferences } from '../store/sessionStore';
+
+const defaultPrefs = (): UserPreferences => ({
+  targetDifficulty: 'Mixed',
+  dailyGoalCount: 1,
+  preferredLanguage: 'Python',
+  theme: 'light',
+});
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -17,13 +24,14 @@ export function SettingsPage() {
     queryKey: ['user', 'me'],
     enabled: !!jwt,
     queryFn: async () => {
-      const res = await api.get<SessionUser & { id?: string }>('/api/user/me');
+      const res = await api.get<SessionUser>('/api/user/me');
       return res.data;
     },
   });
 
   const [apiBase, setApiBase] = useState('');
   const [me, setMe] = useState<SessionUser | null>(null);
+  const [leetcodeInput, setLeetcodeInput] = useState('');
 
   useEffect(() => {
     const base = useSessionStore.getState().apiBaseUrl;
@@ -33,31 +41,51 @@ export function SettingsPage() {
   useEffect(() => {
     if (meQ.data) {
       setMe(meQ.data);
-      if (meQ.data.theme) applyTheme(meQ.data.theme);
+      setLeetcodeInput(meQ.data.leetcodeUsername || '');
+      const t = meQ.data.preferences?.theme;
+      if (t) applyTheme(t);
     }
   }, [meQ.data, applyTheme]);
 
+  const prefs = me?.preferences ?? defaultPrefs();
+
   async function saveProfile() {
     try {
-      await api.patch('/api/user/me', {
-        leetcodeUsername: me?.leetcodeUsername,
-        preferredLanguage: me?.preferredLanguage,
-        targetDifficulty: me?.targetDifficulty,
-        dailyGoal: me?.dailyGoal,
-        theme: me?.theme,
+      await api.patch('/api/user/preferences', {
+        targetDifficulty: prefs.targetDifficulty,
+        dailyGoalCount: prefs.dailyGoalCount,
+        preferredLanguage: prefs.preferredLanguage,
+        theme: prefs.theme,
       });
+      const trimmed = leetcodeInput.trim();
+      if (trimmed) {
+        await api.post('/api/auth/link-leetcode', { leetcodeUsername: trimmed });
+      }
       await setApiBaseUrlStore(apiBase);
-      const fresh = await api.get<SessionUser & { id?: string }>('/api/user/me');
+      const fresh = await api.get<SessionUser>('/api/user/me');
       if (jwt) await setSession(jwt, fresh.data);
       toast.success('Saved.');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Save failed');
+      const err = e as Error & { code?: string };
+      if (err.code === 'LEETCODE_USER_NOT_FOUND') {
+        toast.error('That LeetCode username was not found.');
+      } else {
+        toast.error(err.message || 'Save failed');
+      }
     }
   }
 
   async function signOut() {
     await clearSession();
     navigate('/login');
+  }
+
+  function updatePrefs(p: Partial<UserPreferences>) {
+    if (!me) return;
+    setMe({
+      ...me,
+      preferences: { ...defaultPrefs(), ...me.preferences, ...p },
+    });
   }
 
   return (
@@ -79,16 +107,18 @@ export function SettingsPage() {
             <label className="text-xs text-[var(--muted)]">LeetCode username</label>
             <input
               className="mt-1 block w-full max-w-md rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5"
-              value={me.leetcodeUsername || ''}
-              onChange={(e) => setMe({ ...me, leetcodeUsername: e.target.value })}
+              value={leetcodeInput}
+              onChange={(e) => setLeetcodeInput(e.target.value)}
+              placeholder="Public profile username"
             />
+            <p className="mt-1 text-xs text-[var(--muted)]">Verified against LeetCode before save.</p>
           </div>
           <div>
             <label className="text-xs text-[var(--muted)]">Preferred language</label>
             <select
               className="mt-1 block rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5"
-              value={me.preferredLanguage || 'Python'}
-              onChange={(e) => setMe({ ...me, preferredLanguage: e.target.value })}
+              value={prefs.preferredLanguage}
+              onChange={(e) => updatePrefs({ preferredLanguage: e.target.value })}
             >
               <option>Python</option>
               <option>Java</option>
@@ -102,13 +132,13 @@ export function SettingsPage() {
             <label className="text-xs text-[var(--muted)]">Target difficulty</label>
             <select
               className="mt-1 block rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5"
-              value={me.targetDifficulty || 'MIXED'}
-              onChange={(e) => setMe({ ...me, targetDifficulty: e.target.value })}
+              value={prefs.targetDifficulty}
+              onChange={(e) => updatePrefs({ targetDifficulty: e.target.value })}
             >
-              <option value="EASY">Easy</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="HARD">Hard</option>
-              <option value="MIXED">Mixed</option>
+              <option value="Easy">Easy</option>
+              <option value="Medium">Medium</option>
+              <option value="Hard">Hard</option>
+              <option value="Mixed">Mixed</option>
             </select>
           </div>
           <div>
@@ -118,23 +148,23 @@ export function SettingsPage() {
               min={1}
               max={5}
               className="mt-1 block w-24 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5"
-              value={me.dailyGoal ?? 2}
-              onChange={(e) => setMe({ ...me, dailyGoal: Number(e.target.value) })}
+              value={prefs.dailyGoalCount}
+              onChange={(e) => updatePrefs({ dailyGoalCount: Number(e.target.value) })}
             />
           </div>
           <div>
             <label className="text-xs text-[var(--muted)]">Theme</label>
             <select
               className="mt-1 block rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5"
-              value={me.theme || 'dark'}
+              value={prefs.theme}
               onChange={(e) => {
                 const t = e.target.value as 'light' | 'dark';
-                setMe({ ...me, theme: t });
+                updatePrefs({ theme: t });
                 applyTheme(t);
               }}
             >
-              <option value="dark">Dark</option>
               <option value="light">Light</option>
+              <option value="dark">Dark</option>
             </select>
           </div>
         </div>

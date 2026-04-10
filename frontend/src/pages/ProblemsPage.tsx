@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, getStaleMeta } from '../lib/api';
+import { api } from '../lib/api';
+import type { SessionUser } from '../store/sessionStore';
 
 type Problem = {
   title?: string;
@@ -41,6 +42,13 @@ function extractProblems(root: unknown): Problem[] {
   });
 }
 
+function normalizeBookmarkDifficulty(d: string): 'Easy' | 'Medium' | 'Hard' {
+  const u = d.toUpperCase();
+  if (u === 'EASY') return 'Easy';
+  if (u === 'MEDIUM') return 'Medium';
+  return 'Hard';
+}
+
 export function ProblemsPage() {
   const queryClient = useQueryClient();
   const [difficulty, setDifficulty] = useState('');
@@ -50,45 +58,43 @@ export function ProblemsPage() {
   const [solution, setSolution] = useState<string | null>(null);
 
   const problemsQ = useQuery({
-    queryKey: ['leetcode', 'problems', { difficulty, tags, search }],
+    queryKey: ['problems', 'list', { difficulty, tags, search }],
     queryFn: async () => {
       const q = new URLSearchParams();
       if (difficulty) q.set('difficulty', difficulty);
       if (tags.trim()) q.set('tags', tags.trim().replace(/\s+/g, '+').replace(/,/g, '+'));
       if (search.trim()) q.set('search', search.trim());
       q.set('limit', '40');
-      const res = await api.get(`/api/leetcode/problems?${q.toString()}`);
-      return { body: res.data, stale: getStaleMeta(res.headers) };
+      const res = await api.get<{ problems?: unknown[]; total?: number }>(`/api/problems/list?${q.toString()}`);
+      return res.data;
     },
   });
 
-  const bookmarksQ = useQuery({
-    queryKey: ['bookmarks'],
+  const meQ = useQuery({
+    queryKey: ['user', 'me'],
     queryFn: async () => {
-      const res = await api.get<{ bookmarks: { titleSlug: string; title: string; difficulty: string }[] }>(
-        '/api/bookmarks'
-      );
-      return res.data.bookmarks;
+      const res = await api.get<SessionUser>('/api/user/me');
+      return res.data;
     },
   });
 
-  const unwrapProblems = (box: unknown) => {
-    const b = box as { data?: unknown } | undefined;
-    return b?.data ?? b;
-  };
+  const problems = useMemo(() => {
+    const raw = problemsQ.data?.problems;
+    if (Array.isArray(raw)) return extractProblems(raw);
+    return extractProblems(problemsQ.data);
+  }, [problemsQ.data]);
 
-  const problems = useMemo(
-    () => extractProblems(unwrapProblems(problemsQ.data?.body)),
-    [problemsQ.data]
-  );
-  const bookmarks = bookmarksQ.data ?? [];
+  const bookmarks = meQ.data?.bookmarkedProblems ?? [];
   const bookmarkSet = useMemo(() => new Set(bookmarks.map((b) => b.titleSlug)), [bookmarks]);
 
   const loadOfficial = useCallback(async (titleSlug: string) => {
     setSolution(null);
     try {
-      const res = await api.get(`/api/leetcode/official-solution?titleSlug=${encodeURIComponent(titleSlug)}`);
-      setSolution(JSON.stringify(res.data, null, 2).slice(0, 12000));
+      const res = await api.get<{ solution?: { content?: string } }>(
+        `/api/problems/official-solution?titleSlug=${encodeURIComponent(titleSlug)}`
+      );
+      const c = res.data.solution?.content;
+      setSolution(c ?? JSON.stringify(res.data, null, 2).slice(0, 12000));
     } catch (e) {
       setSolution(e instanceof Error ? e.message : 'Failed');
     }
@@ -97,20 +103,20 @@ export function ProblemsPage() {
   const toggleBookmark = useCallback(
     async (p: Problem) => {
       if (!p.titleSlug || !p.title) return;
-      const diff = (p.difficulty || 'UNKNOWN').toUpperCase();
+      const diff = normalizeBookmarkDifficulty(p.difficulty || 'Medium');
       try {
         if (bookmarkSet.has(p.titleSlug)) {
-          await api.delete(`/api/bookmarks/${encodeURIComponent(p.titleSlug)}`);
+          await api.delete(`/api/user/bookmarks/${encodeURIComponent(p.titleSlug)}`);
         } else {
-          await api.post('/api/bookmarks', {
+          await api.post('/api/user/bookmarks', {
             titleSlug: p.titleSlug,
             title: p.title,
             difficulty: diff,
           });
         }
-        await queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
+        await queryClient.invalidateQueries({ queryKey: ['user', 'me'] });
       } catch {
-        /* toast via global */
+        /* ignore */
       }
     },
     [bookmarkSet, queryClient]
@@ -118,11 +124,6 @@ export function ProblemsPage() {
 
   return (
     <div className="space-y-4">
-      {problemsQ.data?.stale.stale ? (
-        <div className="rounded-lg border border-amber-600/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-          Data may be outdated ({problemsQ.data.stale.staleReason || 'stale cache'}).
-        </div>
-      ) : null}
       <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
         <div className="mb-3 flex flex-wrap gap-2">
           <button
@@ -258,7 +259,7 @@ export function ProblemsPage() {
       {solution ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <h2 className="text-base font-semibold">Official solution payload</h2>
+            <h2 className="text-base font-semibold">Official solution</h2>
             <button type="button" className="text-sm text-[var(--accent)]" onClick={() => setSolution(null)}>
               Close
             </button>

@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose, { type ObjectId } from 'mongoose';
 import type { BookmarkDifficulty } from '../models/User';
 import { normalizeBookmarkDifficulty } from '../models/User';
 
@@ -63,7 +63,7 @@ export async function migrateLegacyUsers(): Promise<void> {
         : mapBookmarks(u.bookmarks);
 
     await col.updateOne(
-      { _id: u._id },
+      { _id: u._id as ObjectId },
       {
         $set: {
           avatarUrl: typeof u.avatarUrl === 'string' ? u.avatarUrl : (u.picture as string) || undefined,

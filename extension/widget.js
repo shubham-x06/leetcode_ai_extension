@@ -63,6 +63,11 @@ function getProblemDescription() {
   return descriptionElement ? descriptionElement.innerText : 'Error: Could not find problem description.';
 }
 
+function getProblemSlugFromUrl() {
+  const m = window.location.pathname.match(/\/problems\/([^/]+)/);
+  return m ? m[1] : '';
+}
+
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).catch(() => {});
 }
@@ -89,7 +94,7 @@ async function refreshWeakTopicsIfNeeded() {
   const now = Date.now();
   if (now - state.weakFetchedAt < WEAK_TTL_MS && state.weakTopics.length) return;
   try {
-    const res = await fetch(`${state.apiBase}/api/user/me/context`, {
+    const res = await fetch(`${state.apiBase}/api/user/me`, {
       headers: { Authorization: `Bearer ${state.jwt}` },
     });
     if (res.status === 401) {
@@ -99,7 +104,7 @@ async function refreshWeakTopicsIfNeeded() {
     }
     if (!res.ok) return;
     const data = await res.json();
-    state.weakTopics = Array.isArray(data.weakTopics) ? data.weakTopics : [];
+    state.weakTopics = Array.isArray(data.cachedWeakTopics) ? data.cachedWeakTopics : [];
     state.weakFetchedAt = now;
     await storageSet({ weakTopics: state.weakTopics, weakTopicsFetchedAt: now });
   } catch {
@@ -248,10 +253,7 @@ export function bootWidget(widgetContainer) {
       const res = await fetchWithRetry(`${state.apiBase}${path}`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          ...body,
-          weakTopics: state.weakTopics.length ? state.weakTopics : undefined,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (
@@ -286,7 +288,7 @@ export function bootWidget(widgetContainer) {
       const language = getCurrentLanguage();
       runAi(
         '/api/ai/hint',
-        { problemDescription, userCode, language },
+        { problemDescription, userCode, language, problemSlug: getProblemSlugFromUrl() },
         'Getting hint…',
         async (data) => {
           const hint = data.hint || '';
@@ -344,13 +346,16 @@ export function bootWidget(widgetContainer) {
       const userCode = getCodeFromEditor();
       const language = getCurrentLanguage();
       runAi(
-        '/api/ai/analyze-code',
+        '/api/ai/analyze',
         { problemDescription, userCode, language },
         'Analyzing code…',
         (data) => {
-          const analysis = data.analysis || '';
+          const text =
+            typeof data === 'object' && data !== null
+              ? JSON.stringify(data, null, 2)
+              : String(data?.analysis || data || '');
           if (chatHistoryDiv) {
-            chatHistoryDiv.innerHTML = `<div class="hint-message"><strong>Analysis</strong><pre style="white-space:pre-wrap;margin-top:8px;">${analysis.replace(/</g, '&lt;')}</pre></div>`;
+            chatHistoryDiv.innerHTML = `<div class="hint-message"><strong>Analysis</strong><pre style="white-space:pre-wrap;margin-top:8px;">${text.replace(/</g, '&lt;')}</pre></div>`;
           }
         }
       );

@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { api, getStaleMeta } from '../lib/api';
-import { StaleBanner } from '../components/StaleBanner';
+import { api } from '../lib/api';
 
 type HistoryRow = {
   title?: string;
@@ -25,7 +24,7 @@ function extractHistory(root: unknown): HistoryRow[] {
       const c = o.contest as Record<string, unknown>;
       rows.push({
         title: typeof c.title === 'string' ? c.title : undefined,
-        rank: typeof o.rank === 'number' ? o.rank : undefined,
+        rank: typeof o.ranking === 'number' ? o.ranking : typeof o.rank === 'number' ? o.rank : undefined,
         rating:
           typeof o.rating === 'number'
             ? o.rating
@@ -43,29 +42,20 @@ function extractHistory(root: unknown): HistoryRow[] {
 
 export function ContestPage() {
   const contestQ = useQuery({
-    queryKey: ['leetcode', 'me', 'contest'],
+    queryKey: ['user', 'contest'],
     queryFn: async () => {
-      const res = await api.get('/api/leetcode/me/contest');
-      return { body: res.data, stale: getStaleMeta(res.headers) };
+      const res = await api.get<{ contestDetails: unknown; contestHistory: unknown }>('/api/user/contest');
+      return res.data;
     },
   });
 
-  const historyQ = useQuery({
-    queryKey: ['leetcode', 'me', 'contest-history'],
-    queryFn: async () => {
-      const res = await api.get('/api/leetcode/me/contest/history');
-      return { body: res.data, stale: getStaleMeta(res.headers) };
-    },
-  });
-
-  const loading = contestQ.isLoading || historyQ.isLoading;
-  const err = (contestQ.error || historyQ.error) as Error & { code?: string } | undefined;
+  const loading = contestQ.isLoading;
+  const err = contestQ.error as Error & { code?: string } | undefined;
 
   const rows = useMemo(() => {
-    const wrap = historyQ.data?.body as { data?: unknown } | undefined;
-    const raw = wrap?.data ?? wrap;
+    const raw = contestQ.data?.contestHistory;
     return extractHistory(raw).slice(0, 80);
-  }, [historyQ.data]);
+  }, [contestQ.data]);
 
   const chartData = useMemo(
     () =>
@@ -91,7 +81,7 @@ export function ContestPage() {
     );
   }
 
-  if (contestQ.isError || historyQ.isError) {
+  if (contestQ.isError) {
     return (
       <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
         {(err as Error).message}
@@ -110,16 +100,13 @@ export function ContestPage() {
     );
   }
 
-  const contestWrap = contestQ.data?.body as { data?: unknown } | undefined;
-  const contestInner = contestWrap?.data ?? contestWrap;
+  const contestInner = contestQ.data?.contestDetails;
   const ratingStr = JSON.stringify(contestInner);
-  const ratingMatch = ratingStr.match(/"rating"\s*:\s*(\d+)/);
+  const ratingMatch = ratingStr.match(/"rating"\s*:\s*([0-9.]+)/);
   const rating = ratingMatch ? Number(ratingMatch[1]) : undefined;
-  const stale = !!(contestQ.data?.stale.stale || historyQ.data?.stale.stale);
 
   return (
     <div className="space-y-4">
-      <StaleBanner stale={stale} />
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
           <h2 className="text-base font-semibold">Current rating</h2>

@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { api, getStaleMeta } from '../lib/api';
-import { StaleBanner } from '../components/StaleBanner';
+import { api } from '../lib/api';
 import {
   extractCalendarMap,
   extractSolvedCounts,
@@ -14,35 +13,24 @@ export function HomePage() {
   const jwt = useSessionStore((s) => s.jwt);
 
   const statsQ = useQuery({
-    queryKey: ['user', 'me', 'stats'],
+    queryKey: ['user', 'stats'],
     enabled: !!jwt,
     queryFn: async () => {
       const res = await api.get<{
         profile: unknown;
         solved: unknown;
-        skill: unknown;
-        language: unknown;
-        meta?: { stale?: boolean; staleReason?: string };
-      }>('/api/user/me/stats');
-      return { ...res.data, _stale: getStaleMeta(res.headers) };
+        skills: unknown;
+        languages: unknown;
+      }>('/api/user/stats');
+      return res.data;
     },
   });
 
   const dailyQ = useQuery({
-    queryKey: ['leetcode', 'daily'],
+    queryKey: ['problems', 'daily'],
     enabled: !!jwt,
     queryFn: async () => {
-      const res = await api.get<{ data: unknown; meta?: { stale?: boolean } }>('/api/leetcode/daily');
-      return { body: res.data, stale: getStaleMeta(res.headers) };
-    },
-  });
-
-  const blurbQ = useQuery({
-    queryKey: ['ai', 'daily-blurb'],
-    enabled: !!jwt && !!user?.leetcodeUsername,
-    meta: { silent: true },
-    queryFn: async () => {
-      const res = await api.post<{ blurb?: string }>('/api/ai/mentor/daily-blurb', {});
+      const res = await api.get<{ problem: unknown }>('/api/problems/daily');
       return res.data;
     },
   });
@@ -50,9 +38,8 @@ export function HomePage() {
   const dailyGoalQ = useQuery({
     queryKey: ['ai', 'daily-goal'],
     enabled: !!jwt && !!user?.leetcodeUsername,
-    meta: { silent: true },
     queryFn: async () => {
-      const res = await api.get<unknown>('/api/ai/daily-goal');
+      const res = await api.get<{ motivation: string; problems: unknown[] }>('/api/ai/daily-goal');
       return res.data;
     },
   });
@@ -85,7 +72,7 @@ export function HomePage() {
       return (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
           <h2 className="text-lg font-semibold">Home</h2>
-          <p className="mt-2 text-sm text-[var(--muted)]">Add your LeetCode username in Settings to load stats.</p>
+          <p className="mt-2 text-sm text-[var(--muted)]">Link your LeetCode username in Settings to load stats.</p>
         </div>
       );
     }
@@ -98,14 +85,12 @@ export function HomePage() {
   }
 
   const solved = statsQ.data?.solved;
-  const skill = statsQ.data?.skill;
-  const stale = !!(statsQ.data?._stale?.stale || statsQ.data?.meta?.stale || dailyQ.data?.stale.stale);
-  const staleReason = statsQ.data?._stale?.staleReason || statsQ.data?.meta?.staleReason;
+  const skills = statsQ.data?.skills;
 
   const counts = extractSolvedCounts(solved ?? statsQ.data?.profile);
   const calMap = extractCalendarMap(solved ?? statsQ.data?.profile);
   const streaks = streaksFromCalendar(calMap);
-  const weak = extractWeakTags(skill, 10);
+  const weak = extractWeakTags(skills, 10);
   const heatValues = Object.values(calMap);
   const maxHeat = heatValues.length ? Math.max(1, ...heatValues) : 1;
   const recentDays = Object.keys(calMap)
@@ -115,13 +100,12 @@ export function HomePage() {
 
   return (
     <div className="space-y-4">
-      <StaleBanner stale={stale} reason={staleReason} />
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
           <h2 className="text-base font-semibold">Welcome</h2>
           <div className="mt-3 flex items-center gap-3">
-            {user?.picture ? (
-              <img src={user.picture} alt="" className="h-12 w-12 rounded-full" width={48} height={48} />
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt="" className="h-12 w-12 rounded-full" width={48} height={48} />
             ) : null}
             <div>
               <div className="font-semibold">{user?.name || 'Learner'}</div>
@@ -129,11 +113,22 @@ export function HomePage() {
             </div>
           </div>
           <p className="mt-3 text-sm text-[var(--muted)]">
-            Daily goal preview:{' '}
+            Daily focus:{' '}
             <span className="text-[var(--text)]">
-              {dailyGoalQ.data ? JSON.stringify(dailyGoalQ.data).slice(0, 160) : '—'}
+              {dailyGoalQ.data?.motivation
+                ? dailyGoalQ.data.motivation.slice(0, 220) + (dailyGoalQ.data.motivation.length > 220 ? '…' : '')
+                : '—'}
             </span>
           </p>
+          {dailyGoalQ.data?.problems?.length ? (
+            <ul className="mt-2 list-inside list-disc text-sm text-[var(--text)]">
+              {dailyGoalQ.data.problems.slice(0, 5).map((p: { title?: string; titleSlug?: string }) => (
+                <li key={p.titleSlug}>
+                  {p.title} <span className="text-[var(--muted)]">({p.titleSlug})</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
         <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
           <h2 className="text-base font-semibold">Solved</h2>
@@ -184,13 +179,8 @@ export function HomePage() {
         <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
           <h2 className="text-base font-semibold">Daily problem</h2>
           <pre className="mt-2 max-h-48 overflow-auto text-xs text-[var(--muted)]">
-            {JSON.stringify(dailyQ.data?.body ?? dailyQ.data, null, 2).slice(0, 2000)}
+            {JSON.stringify(dailyQ.data?.problem ?? dailyQ.data, null, 2).slice(0, 2000)}
           </pre>
-          {blurbQ.data?.blurb ? (
-            <p className="mt-3 text-sm">{blurbQ.data.blurb}</p>
-          ) : (
-            <p className="mt-2 text-sm text-[var(--muted)]">AI blurb loads when username + stats sync.</p>
-          )}
         </div>
         <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
           <h2 className="text-base font-semibold">Weak topics</h2>

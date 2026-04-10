@@ -3,16 +3,26 @@ import { storageGet, storageSet } from '../lib/storage';
 
 const DEFAULT_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
+export type UserPreferences = {
+  targetDifficulty: string;
+  dailyGoalCount: number;
+  preferredLanguage: string;
+  theme: 'light' | 'dark';
+};
+
 export type SessionUser = {
-  id?: string;
-  email?: string;
   name?: string;
-  picture?: string;
-  leetcodeUsername?: string;
-  preferredLanguage?: string;
-  targetDifficulty?: string;
-  dailyGoal?: number;
-  theme?: 'light' | 'dark';
+  email?: string;
+  avatarUrl?: string;
+  leetcodeUsername?: string | null;
+  preferences?: UserPreferences;
+  cachedWeakTopics?: string[];
+  bookmarkedProblems?: Array<{
+    titleSlug: string;
+    title: string;
+    difficulty: string;
+    addedAt?: string;
+  }>;
 };
 
 type SessionState = {
@@ -43,7 +53,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   setSession: async (jwt, user) => {
     await storageSet({ jwt, user });
     set({ jwt, user });
-    if (user?.theme) get().applyTheme(user.theme);
+    if (user?.preferences?.theme) get().applyTheme(user.preferences.theme);
   },
 
   clearSession: async () => {
@@ -62,8 +72,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const jwt = typeof s.jwt === 'string' ? s.jwt : null;
     const user = (s.user as SessionUser) || null;
     const apiBaseUrl = typeof s.apiBaseUrl === 'string' ? s.apiBaseUrl : DEFAULT_BASE;
-    if (user?.theme) {
-      document.documentElement.setAttribute('data-theme', user.theme);
+    if (user?.preferences?.theme) {
+      document.documentElement.setAttribute('data-theme', user.preferences.theme);
     }
     set({ jwt, user, apiBaseUrl, hydrated: true });
   },

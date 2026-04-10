@@ -1,15 +1,13 @@
 import express, { Router } from 'express';
 import cors from 'cors';
 import { requireAuth } from './middleware/auth';
-import { validateBody } from './middleware/validate';
 import { errorHandler } from './middleware/errorHandler';
 import { aiRateLimiter } from './middleware/rateLimitAi';
 import { authRouter } from './routes/authRoutes';
+import { protectedAuthRouter } from './routes/protectedAuthRoutes';
 import { userRouter } from './routes/userRoutes';
-import { bookmarkRouter } from './routes/bookmarkRoutes';
-import { leetcodeRouter } from './routes/leetcodeRoutes';
-import { aiRouter, postHintHandler, postSolutionHandler } from './routes/aiRoutes';
-import { hintBodySchema, solutionBodySchema } from './validation/schemas';
+import { problemsRouter } from './routes/problemsRoutes';
+import { aiRouter } from './routes/aiRoutes';
 
 export function createApp() {
   const app = express();
@@ -44,12 +42,10 @@ export function createApp() {
 
   const protectedApi = Router();
   protectedApi.use(requireAuth);
+  protectedApi.use('/auth', protectedAuthRouter);
   protectedApi.use('/user', userRouter);
-  protectedApi.use('/bookmarks', bookmarkRouter);
-  protectedApi.use('/leetcode', leetcodeRouter);
+  protectedApi.use('/problems', problemsRouter);
   protectedApi.use('/ai', aiRateLimiter, aiRouter);
-  protectedApi.post('/get-hint', validateBody(hintBodySchema), postHintHandler);
-  protectedApi.post('/get-solution', validateBody(solutionBodySchema), postSolutionHandler);
 
   app.use('/api', protectedApi);
 

@@ -10,8 +10,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import { api, getStaleMeta } from '../lib/api';
-import { StaleBanner } from '../components/StaleBanner';
+import { api } from '../lib/api';
 import { extractLanguageSplit, extractRadarTopics } from '../lib/stats';
 
 const PIE_COLORS = ['#7aa2f7', '#9ece6a', '#e0af68', '#f7768e', '#bb9af7', '#7dcfff'];
@@ -45,37 +44,23 @@ export function ProgressPage() {
   const results = useQueries({
     queries: [
       {
-        queryKey: ['leetcode', 'me', 'skill'],
+        queryKey: ['user', 'stats'],
         queryFn: async () => {
-          const res = await api.get('/api/leetcode/me/skill');
-          return { data: res.data, stale: getStaleMeta(res.headers) };
+          const res = await api.get('/api/user/stats');
+          return res.data;
         },
       },
       {
-        queryKey: ['leetcode', 'me', 'language'],
+        queryKey: ['user', 'submissions'],
         queryFn: async () => {
-          const res = await api.get('/api/leetcode/me/language');
-          return { data: res.data, stale: getStaleMeta(res.headers) };
-        },
-      },
-      {
-        queryKey: ['leetcode', 'me', 'ac-submissions'],
-        queryFn: async () => {
-          const res = await api.get('/api/leetcode/me/ac-submissions?limit=10');
-          return { data: res.data, stale: getStaleMeta(res.headers) };
-        },
-      },
-      {
-        queryKey: ['leetcode', 'me', 'progress'],
-        queryFn: async () => {
-          const res = await api.get('/api/leetcode/me/progress');
-          return { data: res.data, stale: getStaleMeta(res.headers) };
+          const res = await api.get('/api/user/submissions?limit=10');
+          return res.data;
         },
       },
     ],
   });
 
-  const [skQ, lgQ, acQ, prQ] = results;
+  const [statsQ, subsQ] = results;
   const loading = results.some((r) => r.isLoading);
   const firstErr = results.find((r) => r.isError)?.error as (Error & { code?: string }) | undefined;
 
@@ -99,33 +84,21 @@ export function ProgressPage() {
     );
   }
 
-  const unwrap = (box: { data?: unknown } | undefined): unknown => {
-    const d = box?.data;
-    if (d && typeof d === 'object' && d !== null && 'data' in d) {
-      return (d as { data: unknown }).data;
-    }
-    return d;
-  };
-  const skillRoot = unwrap(skQ.data);
-  const langRoot = unwrap(lgQ.data);
-  const subsRoot = unwrap(acQ.data);
-  const progressRoot = unwrap(prQ.data);
+  const stats = statsQ.data as { skills?: unknown; languages?: unknown } | undefined;
+  const skillRoot = stats?.skills;
+  const langRoot = stats?.languages;
+  const submissionsWrap = subsQ.data as { submissions?: unknown[] } | undefined;
+  const subsRoot = submissionsWrap?.submissions ?? subsQ.data;
 
   const radarData = extractRadarTopics(skillRoot).map((r) => ({
     topic: r.topic.slice(0, 14),
     strength: r.value,
   }));
   const langData = extractLanguageSplit(langRoot);
-  const subRows = extractSubs(subsRoot);
-  const acceptStr = JSON.stringify(progressRoot).toLowerCase();
-  const beatMatch = acceptStr.match(/beat[\s_-]?(\d+\.?\d*)%?/);
-  const beat = beatMatch ? `${beatMatch[1]}%` : '—';
-
-  const stale = results.some((r) => r.data?.stale?.stale);
+  const subRows = Array.isArray(subsRoot) ? extractSubs(subsRoot) : extractSubs(subsRoot);
 
   return (
     <div className="space-y-4">
-      <StaleBanner stale={stale} />
       {radarData.length === 0 && langData.length === 0 ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5 text-sm text-[var(--muted)]">
           Solve a few problems with a public profile to unlock radar and language charts.
@@ -168,15 +141,6 @@ export function ProgressPage() {
             </div>
           )}
         </div>
-      </div>
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
-        <h2 className="text-base font-semibold">Beat % vs global</h2>
-        <p className="text-sm">
-          Acceptance snapshot (heuristic): <strong>{beat}</strong>
-        </p>
-        <pre className="mt-2 max-h-40 overflow-auto text-xs text-[var(--muted)]">
-          {JSON.stringify(progressRoot, null, 2).slice(0, 4000)}
-        </pre>
       </div>
       <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
         <h2 className="text-base font-semibold">Recent accepted submissions</h2>

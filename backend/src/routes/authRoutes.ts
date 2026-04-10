@@ -3,13 +3,13 @@ import { AppError } from '../errors/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
 import { validateBody } from '../middleware/validate';
 import { googleAuthBodySchema } from '../validation/schemas';
-import { User } from '../models/User';
+import { User, type IUser } from '../models/User';
 import { verifyGoogleAccessToken, verifyGoogleIdToken } from '../services/googleAuth';
 import { signUserToken } from '../services/jwt';
 
 export const authRouter = Router();
 
-function serializeAuthUser(u: import('mongoose').HydratedDocument<import('../models/User').IUser>) {
+function serializeAuthUser(u: Pick<IUser, 'name' | 'email' | 'avatarUrl' | 'leetcodeUsername'>) {
   return {
     name: u.name,
     email: u.email,

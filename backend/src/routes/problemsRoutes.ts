@@ -48,6 +48,7 @@ problemsRouter.get(
       const q = new URLSearchParams();
       const tags = req.query.tags;
       const difficulty = req.query.difficulty;
+      const search = req.query.search;
       const rawLimit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 20;
       const rawSkip = typeof req.query.skip === 'string' ? Number(req.query.skip) : 0;
       const limit = Number.isFinite(rawLimit) ? Math.min(50, Math.max(1, Math.floor(rawLimit))) : 20;
@@ -57,6 +58,7 @@ problemsRouter.get(
         const d = difficulty.toUpperCase();
         q.set('difficulty', d === 'EASY' || d === 'MEDIUM' || d === 'HARD' ? d : difficulty);
       }
+      if (typeof search === 'string' && search.trim()) q.set('search', search.trim());
       q.set('limit', String(limit));
       q.set('skip', String(skip));
       const path = `/problems?${q.toString()}`;

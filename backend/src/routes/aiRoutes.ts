@@ -1,19 +1,15 @@
-import { Router, type RequestHandler } from 'express';
+import { Router } from 'express';
 import { AppError } from '../errors/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
 import { validateBody } from '../middleware/validate';
-import {
-  analyzeCodeBodySchema,
-  hintBodySchema,
-  postSolveBodySchema,
-  solutionBodySchema,
-  studyPlanBodySchema,
-} from '../validation/schemas';
+import { analyzeBodySchema, hintBodySchema, solutionBodySchema } from '../validation/schemas';
 import { User } from '../models/User';
 import { chatTextStream, mapGroqError, normalizeSolutionCode } from '../services/groqAi';
 import { alfaGet } from '../services/alfaClient';
 import { getWeakTopicsForUser } from '../services/userContext';
-import { buildDailyGoalsPayload } from '../services/dailyGoalService';
+import { readSolvedProblemCount } from '../services/weakTopics';
+import { getOrBuildDailyGoal } from '../services/dailyGoalService';
+import { extractProblemsArray, toSlimProblems } from '../services/alfaProblems';
 
 export const aiRouter = Router();
 
@@ -22,65 +18,102 @@ function groqThrow(err: unknown): never {
   throw new AppError(m.status, m.message, m.code);
 }
 
-async function resolveWeakTopics(
-  req: import('express').Request,
-  bodyWeak?: string[]
-): Promise<string[]> {
-  if (Array.isArray(bodyWeak) && bodyWeak.length) {
-    return bodyWeak.filter((x) => typeof x === 'string').slice(0, 12);
-  }
-  if (req.userId) {
-    return getWeakTopicsForUser(req.userId);
-  }
-  return [];
+function parseJsonFromAi(raw: string): unknown {
+  const cleaned = raw.replace(/```json\n?|```/g, '').trim();
+  return JSON.parse(cleaned);
 }
 
-export const postHintHandler: RequestHandler = asyncHandler(async (req, res) => {
-  const { problemDescription, userCode, language, weakTopics } = req.body as {
-    problemDescription: string;
-    userCode: string;
-    language: string;
-    weakTopics?: string[];
-  };
-  const weak = await resolveWeakTopics(req, weakTopics);
-  const weakLine =
-    weak.length > 0
-      ? `User's weaker areas (personalize hint toward these, do not name all at once): ${weak.join(', ')}.`
-      : '';
+function appendHintHistory(userId: string, problemSlug: string, hint: string): void {
+  void (async () => {
+    const u = await User.findById(userId);
+    if (!u) return;
+    u.hintHistory.push({ problemSlug: problemSlug || 'unknown', hint, askedAt: new Date() });
+    if (u.hintHistory.length > 5) {
+      u.hintHistory = u.hintHistory.slice(-5);
+    }
+    await u.save();
+  })().catch(() => {});
+}
 
-  const systemPrompt = `You are a LeetCode assistant. Provide ONE concise hint to help the user. It should be specific to the problem and code provided. The hint should guide the user towards the next step in solving the problem without giving away the full solution. DO NOT provide a full solution or code snippet. Maximum 40 words. ${weakLine}`;
+aiRouter.post(
+  '/hint',
+  validateBody(hintBodySchema),
+  asyncHandler(async (req, res) => {
+    const { problemDescription, userCode, language, problemSlug } = req.body as {
+      problemDescription: string;
+      userCode: string;
+      language: string;
+      problemSlug?: string;
+    };
 
-  const userPrompt = `Problem: ${problemDescription}\n\nMy code (in ${language}):\n${userCode}\n\nWhat's my next step?`;
+    const user = await User.findById(req.userId);
+    if (!user) {
+      throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
+    }
 
-  try {
-    const hint = await chatTextStream(systemPrompt, userPrompt, 120);
-    res.json({ hint });
-  } catch (err) {
-    groqThrow(err);
-  }
-});
+    let weakLine = '';
+    let solvedTotal = 0;
+    if (user.cachedWeakTopics?.length) {
+      weakLine = user.cachedWeakTopics.join(', ');
+    } else {
+      const live = await getWeakTopicsForUser(req.userId!);
+      weakLine = live.join(', ');
+    }
 
-export const postSolutionHandler: RequestHandler = asyncHandler(async (req, res) => {
-  const { problemDescription, userCode, language, weakTopics } = req.body as {
-    problemDescription: string;
-    userCode?: string;
-    language: string;
-    weakTopics?: string[];
-  };
-  const code = userCode || '';
-  await resolveWeakTopics(req, weakTopics);
+    const lc = user.leetcodeUsername?.trim();
+    if (lc) {
+      try {
+        const { data } = await alfaGet(`/${encodeURIComponent(lc)}/solved`);
+        solvedTotal = readSolvedProblemCount(data);
+      } catch {
+        solvedTotal = 0;
+      }
+    }
 
-  let normalizedLanguage = language;
-  if (language.toLowerCase().includes('python')) {
-    normalizedLanguage = 'Python';
-  } else if (language === 'C++') {
-    normalizedLanguage = 'C++';
-  } else if (language === 'C#') {
-    normalizedLanguage = 'C#';
-  }
+    const systemPrompt = `You are a LeetCode AI assistant. The user's weak topics are: ${weakLine || 'not yet synced'}.
+They have solved ${solvedTotal} problems total.
+Provide ONE concise hint (max 40 words) to guide their next step.
+Do NOT give the full solution. Do NOT write code. Guide their thinking.`;
 
-  const systemPrompt = `You are a code generator. Return ONLY valid ${normalizedLanguage} code. No explanations. No examples. No text before or after the code.`;
-  const userPrompt = `Write a complete solution for this LeetCode problem in ${normalizedLanguage}. Return ONLY the code, nothing else:
+    const userPrompt = `Problem: ${problemDescription}\n\nMy code (in ${language}):\n${userCode}\n\nWhat's my next step?`;
+
+    try {
+      const hint = await chatTextStream(systemPrompt, userPrompt, 120);
+      res.json({ hint });
+      appendHintHistory(req.userId!.toString(), problemSlug || '', hint);
+    } catch (err) {
+      groqThrow(err);
+    }
+  })
+);
+
+aiRouter.post(
+  '/solution',
+  validateBody(solutionBodySchema),
+  asyncHandler(async (req, res) => {
+    const { problemDescription, userCode, language } = req.body as {
+      problemDescription: string;
+      userCode?: string;
+      language: string;
+    };
+    const code = userCode ?? '';
+
+    const user = await User.findById(req.userId);
+    let normalizedLanguage = language.trim();
+    if (!normalizedLanguage || /^(auto|default)$/i.test(normalizedLanguage)) {
+      normalizedLanguage = user?.preferences?.preferredLanguage || 'Python';
+    }
+
+    if (normalizedLanguage.toLowerCase().includes('python')) {
+      normalizedLanguage = 'Python';
+    } else if (normalizedLanguage === 'C++' || normalizedLanguage.toLowerCase() === 'cpp') {
+      normalizedLanguage = 'C++';
+    } else if (normalizedLanguage === 'C#') {
+      normalizedLanguage = 'C#';
+    }
+
+    const systemPrompt = `You are a code generator. Return ONLY valid ${normalizedLanguage} code. No explanations. No examples. No text before or after the code.`;
+    const userPrompt = `Write a complete solution for this LeetCode problem in ${normalizedLanguage}. Return ONLY the code, nothing else:
 
 ${problemDescription}
 
@@ -93,36 +126,41 @@ Rules:
 4. Code must be correct and efficient
 5. Start directly with the class/function definition`;
 
-  try {
-    const raw = await chatTextStream(systemPrompt, userPrompt, 1200);
-    const solution = normalizeSolutionCode(raw, normalizedLanguage);
-    res.json({ solution });
-  } catch (err) {
-    groqThrow(err);
-  }
-});
-
-aiRouter.post('/hint', validateBody(hintBodySchema), postHintHandler);
-aiRouter.post('/solution', validateBody(solutionBodySchema), postSolutionHandler);
+    try {
+      const raw = await chatTextStream(systemPrompt, userPrompt, 1200);
+      const solution = normalizeSolutionCode(raw, normalizedLanguage);
+      res.json({ solution });
+    } catch (err) {
+      groqThrow(err);
+    }
+  })
+);
 
 aiRouter.post(
-  '/analyze-code',
-  validateBody(analyzeCodeBodySchema),
+  '/analyze',
+  validateBody(analyzeBodySchema),
   asyncHandler(async (req, res) => {
-    const { problemDescription, userCode, language, weakTopics } = req.body as {
+    const { problemDescription, userCode, language } = req.body as {
       problemDescription: string;
       userCode: string;
       language: string;
-      weakTopics?: string[];
     };
-    const weak = await resolveWeakTopics(req, weakTopics);
-    const weakLine = weak.length ? `Weak areas to relate feedback to: ${weak.join(', ')}.` : '';
 
-    const system = `You are a senior interviewer. Analyze the user's approach. Return markdown with sections: ## Complexity, ## What works, ## Improvements, ## Topics reinforced. Be concise. ${weakLine}`;
-    const user = `Problem:\n${problemDescription}\n\nLanguage: ${language}\n\nCode:\n${userCode}`;
+    const system = `You are a senior engineer. Respond with JSON ONLY (no markdown), matching this shape:
+{
+  "timeComplexity": "e.g. O(n)",
+  "spaceComplexity": "e.g. O(1)",
+  "alternativeApproaches": ["short bullet strings"],
+  "topicReinforced": "one topic name",
+  "improvementTips": ["short tips"]
+}`;
+
+    const userPrompt = `Problem:\n${problemDescription}\n\nLanguage: ${language}\n\nCode:\n${userCode}`;
+
     try {
-      const text = await chatTextStream(system, user, 900);
-      res.json({ analysis: text });
+      const raw = await chatTextStream(system, userPrompt, 900);
+      const parsed = parseJsonFromAi(raw) as Record<string, unknown>;
+      res.json(parsed);
     } catch (err) {
       groqThrow(err);
     }
@@ -132,113 +170,56 @@ aiRouter.post(
 aiRouter.get(
   '/daily-goal',
   asyncHandler(async (req, res) => {
-    const payload = await buildDailyGoalsPayload(req.userId!);
+    const payload = await getOrBuildDailyGoal(req.userId!);
     res.json(payload);
   })
 );
 
-aiRouter.post(
-  '/mentor/daily-blurb',
+aiRouter.get(
+  '/recommend',
   asyncHandler(async (req, res) => {
     const user = await User.findById(req.userId);
-    if (!user?.leetcodeUsername) {
+    if (!user?.leetcodeUsername?.trim()) {
       throw new AppError(400, 'Set LeetCode username first', 'NO_LC_USER');
     }
+
     const weak = await getWeakTopicsForUser(req.userId!);
-    const { data: daily } = await alfaGet('/daily');
-    const system =
-      'You motivate a learner. In 2-3 sentences, explain why attempting the daily LeetCode problem helps them, referencing weak areas if provided. No spoilers. Friendly tone.';
-    const userPrompt = `Daily problem payload (JSON excerpt): ${JSON.stringify(daily).slice(0, 4000)}\nWeak topics: ${weak.join(', ') || 'unknown'}`;
-    try {
-      const blurb = await chatTextStream(system, userPrompt, 200);
-      res.json({ blurb, weakTopics: weak });
-    } catch (err) {
-      groqThrow(err);
+    const diff = user.preferences?.targetDifficulty ?? 'Mixed';
+    const params = new URLSearchParams();
+    params.set('limit', '24');
+    if (diff === 'Easy') params.set('difficulty', 'EASY');
+    else if (diff === 'Medium') params.set('difficulty', 'MEDIUM');
+    else if (diff === 'Hard') params.set('difficulty', 'HARD');
+    if (weak[0]) params.set('tags', weak[0].replace(/\s+/g, '+'));
+
+    const { data } = await alfaGet(`/problems?${params.toString()}`);
+    const pool = toSlimProblems(extractProblemsArray(data), 24);
+    if (pool.length === 0) {
+      throw new AppError(502, 'Could not load problems for recommendation', 'ALFA_ERROR');
     }
-  })
-);
 
-aiRouter.post(
-  '/mentor/daily-goals',
-  asyncHandler(async (req, res) => {
-    const payload = await buildDailyGoalsPayload(req.userId!);
-    res.json(payload);
-  })
-);
+    const system = `Pick the single best next LeetCode problem for this learner. Return JSON ONLY:
+{"title":"","titleSlug":"","difficulty":"Easy|Medium|Hard","reason":"one sentence why"}
+You MUST copy title, titleSlug, difficulty exactly from the provided list.`;
+    const userPrompt = `Weak topics: ${weak.join(', ') || 'general practice'}.\nProblems: ${JSON.stringify(pool)}`;
 
-aiRouter.post(
-  '/mentor/next-problem',
-  asyncHandler(async (req, res) => {
-    const weak = await getWeakTopicsForUser(req.userId!);
-    const user = await User.findById(req.userId);
-    const diff = user?.targetDifficulty || 'MIXED';
-    const path =
-      diff === 'MIXED'
-        ? `/problems?limit=12${weak[0] ? `&tags=${encodeURIComponent(weak[0])}` : ''}`
-        : `/problems?difficulty=${encodeURIComponent(diff)}&limit=12${
-            weak[0] ? `&tags=${encodeURIComponent(weak[0])}` : ''
-          }`;
-    const { data: problems } = await alfaGet(path);
-    const system =
-      'Recommend ONE next problem. JSON only: {"titleSlug":"","title":"","difficulty":"","why":""} from the provided list.';
-    const userPrompt = `Weak: ${weak.join(', ')}. List: ${JSON.stringify(problems).slice(0, 8000)}`;
     try {
-      const raw = await chatTextStream(system, userPrompt, 350);
-      let rec: unknown = {};
-      try {
-        rec = JSON.parse(raw.replace(/```json\n?|```/g, '').trim());
-      } catch {
-        rec = { parseError: true, raw };
-      }
-      res.json(rec);
-    } catch (err) {
-      groqThrow(err);
-    }
-  })
-);
-
-aiRouter.post(
-  '/mentor/study-plan',
-  validateBody(studyPlanBodySchema),
-  asyncHandler(async (req, res) => {
-    const { topic } = req.body as { topic: string };
-    const { data: problems } = await alfaGet(
-      `/problems?tags=${encodeURIComponent(topic)}&limit=40`
-    );
-    const system = `Create a 7-day study plan using ONLY problems from the JSON list (use real titleSlug and title). JSON only:
-{"days":[{"day":1,"problems":[{"titleSlug":"","title":"","focus":""}],"note":""}, ...]}`;
-    const userPrompt = `Topic: ${topic}.\nProblems: ${JSON.stringify(problems).slice(0, 12000)}`;
-    try {
-      const raw = await chatTextStream(system, userPrompt, 1200);
-      let plan: unknown = {};
-      try {
-        plan = JSON.parse(raw.replace(/```json\n?|```/g, '').trim());
-      } catch {
-        plan = { parseError: true, raw };
-      }
-      res.json(plan);
-    } catch (err) {
-      groqThrow(err);
-    }
-  })
-);
-
-aiRouter.post(
-  '/mentor/post-solve',
-  validateBody(postSolveBodySchema),
-  asyncHandler(async (req, res) => {
-    const { problemTitle, code, language } = req.body as {
-      problemTitle?: string;
-      code: string;
-      language: string;
-    };
-    const weak = await getWeakTopicsForUser(req.userId!);
-    const system =
-      'Post-solve coaching: markdown with ## Complexity, ## Alternative ideas, ## Drill suggestions. Be concise.';
-    const userPrompt = `Problem: ${problemTitle || 'Unknown'}\nWeak topics: ${weak.join(', ')}\nLanguage: ${language}\nCode:\n${code}`;
-    try {
-      const text = await chatTextStream(system, userPrompt, 900);
-      res.json({ analysis: text });
+      const raw = await chatTextStream(system, userPrompt, 400);
+      const parsed = parseJsonFromAi(raw) as {
+        title?: string;
+        titleSlug?: string;
+        difficulty?: string;
+        reason?: string;
+      };
+      const match = pool.find((p) => p.titleSlug === parsed.titleSlug) || pool[0];
+      res.json({
+        recommendation: {
+          title: parsed.title || match.title,
+          titleSlug: parsed.titleSlug || match.titleSlug,
+          difficulty: parsed.difficulty || match.difficulty,
+          reason: parsed.reason || 'Targets your current practice gaps.',
+        },
+      });
     } catch (err) {
       groqThrow(err);
     }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { useSessionStore } from '../store/sessionStore';
+import { useSessionStore, type SessionUser } from '../store/sessionStore';
 
 function getGoogleAccessTokenViaBackground(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -40,11 +40,16 @@ export function LoginPage() {
     setLoading(true);
     try {
       const accessToken = await getGoogleAccessTokenViaBackground();
-      const { data } = await api.post<{ token: string; user: Record<string, unknown> }>(
-        '/api/auth/google',
-        { accessToken }
-      );
-      await setSession(data.token, data.user as import('../store/sessionStore').SessionUser);
+      const { data } = await api.post<{
+        token: string;
+        needsLeetCodeLink?: boolean;
+        user: SessionUser;
+      }>('/api/auth/google', { accessToken });
+      await setSession(data.token, data.user);
+      if (data.needsLeetCodeLink) {
+        navigate('/app/settings');
+        return;
+      }
       navigate('/app/home');
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Login failed');
@@ -68,12 +73,12 @@ export function LoginPage() {
         type="button"
         className="mt-4 w-full rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[#0f0f12] disabled:opacity-50"
         disabled={loading}
-        onClick={onLogin}
+        onClick={() => void onLogin()}
       >
         {loading ? 'Signing in…' : 'Continue with Google'}
       </button>
       <p className="mt-4 text-xs text-[var(--muted)]">
-        After login, set your LeetCode username in Settings so we can load your public stats.
+        After login, link your LeetCode username in Settings so we can load your public stats.
       </p>
     </div>
   );
