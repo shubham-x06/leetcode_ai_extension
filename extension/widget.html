@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>AI Companion</title>
+</head>
+<body>
+  <div class="ai-widget-header">
+    <h3>AI Companion</h3>
+    <button type="button" id="toggle-widget-body" title="Minimize">−</button>
+  </div>
+  <div class="ai-widget-body">
+    <div id="offline-banner" class="lc-ai-banner lc-ai-banner--hidden" role="status">
+      You appear offline. AI actions are disabled.
+    </div>
+    <div id="auth-banner" class="lc-ai-banner lc-ai-banner--hidden" role="status">
+      Sign in from the dashboard (extension icon) for personalized weak-topic context.
+    </div>
+    <details id="hint-history-wrap" class="lc-ai-history">
+      <summary>Hint history <span id="hint-count" class="lc-ai-muted">(0)</span></summary>
+      <ul id="hint-history-list" class="lc-ai-history-list"></ul>
+    </details>
+    <div id="ai-chat-history" class="ai-chat-history">
+      <div class="hint-message">Get a hint, full solution, or code analysis.</div>
+    </div>
+    <div class="ai-widget-controls">
+      <button type="button" id="get-hint-btn">Get Hint</button>
+      <button type="button" id="get-solution-btn">Get Solution</button>
+      <button type="button" id="analyze-code-btn">Analyze My Code</button>
+    </div>
+    <div class="ai-widget-footer lc-ai-muted" id="widget-status"></div>
+  </div>
+</body>
+</html>
