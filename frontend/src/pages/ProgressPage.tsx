@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useQueries } from '@tanstack/react-query';
 import {
   Cell,
   Pie,
@@ -10,110 +10,134 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import { ApiError, apiFetch } from '../lib/api';
+import { api, getStaleMeta } from '../lib/api';
 import { StaleBanner } from '../components/StaleBanner';
 import { extractLanguageSplit, extractRadarTopics } from '../lib/stats';
 
 const PIE_COLORS = ['#7aa2f7', '#9ece6a', '#e0af68', '#f7768e', '#bb9af7', '#7dcfff'];
 
+type SubRow = { title?: string; timestamp?: string; lang?: string };
+
+function extractSubs(root: unknown): SubRow[] {
+  const rows: SubRow[] = [];
+  const visit = (node: unknown, depth = 0): void => {
+    if (depth > 18 || node == null) return;
+    if (Array.isArray(node)) {
+      node.forEach((x) => visit(x, depth + 1));
+      return;
+    }
+    if (typeof node !== 'object') return;
+    const o = node as Record<string, unknown>;
+    if (typeof o.title === 'string' && (o.timestamp || o.statusDisplay)) {
+      rows.push({
+        title: o.title,
+        timestamp: String(o.timestamp || o.date || ''),
+        lang: typeof o.lang === 'string' ? o.lang : typeof o.language === 'string' ? o.language : undefined,
+      });
+    }
+    for (const v of Object.values(o)) visit(v, depth + 1);
+  };
+  visit(root);
+  return rows.slice(0, 10);
+}
+
 export function ProgressPage() {
-  const [skill, setSkill] = useState<unknown>(null);
-  const [lang, setLang] = useState<unknown>(null);
-  const [subs, setSubs] = useState<unknown>(null);
-  const [progress, setProgress] = useState<unknown>(null);
-  const [meta, setMeta] = useState<{ stale?: boolean; staleReason?: string }>({});
-  const [err, setErr] = useState<string | null>(null);
+  const results = useQueries({
+    queries: [
+      {
+        queryKey: ['leetcode', 'me', 'skill'],
+        queryFn: async () => {
+          const res = await api.get('/api/leetcode/me/skill');
+          return { data: res.data, stale: getStaleMeta(res.headers) };
+        },
+      },
+      {
+        queryKey: ['leetcode', 'me', 'language'],
+        queryFn: async () => {
+          const res = await api.get('/api/leetcode/me/language');
+          return { data: res.data, stale: getStaleMeta(res.headers) };
+        },
+      },
+      {
+        queryKey: ['leetcode', 'me', 'ac-submissions'],
+        queryFn: async () => {
+          const res = await api.get('/api/leetcode/me/ac-submissions?limit=10');
+          return { data: res.data, stale: getStaleMeta(res.headers) };
+        },
+      },
+      {
+        queryKey: ['leetcode', 'me', 'progress'],
+        queryFn: async () => {
+          const res = await api.get('/api/leetcode/me/progress');
+          return { data: res.data, stale: getStaleMeta(res.headers) };
+        },
+      },
+    ],
+  });
 
-  useEffect(() => {
-    (async () => {
-      setErr(null);
-      try {
-        const [sk, lg, ac, pr] = await Promise.all([
-          apiFetch<unknown>('/api/leetcode/me/skill'),
-          apiFetch<unknown>('/api/leetcode/me/language'),
-          apiFetch<unknown>('/api/leetcode/me/ac-submissions?limit=10'),
-          apiFetch<unknown>('/api/leetcode/me/progress'),
-        ]);
-        setSkill(sk.data);
-        setLang(lg.data);
-        setSubs(ac.data);
-        setProgress(pr.data);
-        setMeta({
-          stale: !!(sk.meta.stale || lg.meta.stale || ac.meta.stale || pr.meta.stale),
-          staleReason: sk.meta.staleReason,
-        });
-      } catch (e) {
-        if (e instanceof ApiError && e.code === 'NO_LC_USER') {
-          setErr('Set your LeetCode username in Settings.');
-          return;
-        }
-        setErr(e instanceof Error ? e.message : 'Failed to load progress');
-      }
-    })();
-  }, []);
+  const [skQ, lgQ, acQ, prQ] = results;
+  const loading = results.some((r) => r.isLoading);
+  const firstErr = results.find((r) => r.isError)?.error as (Error & { code?: string }) | undefined;
 
-  const radarData = extractRadarTopics(skill).map((r) => ({
-    topic: r.topic.slice(0, 14),
-    strength: r.value,
-  }));
-  const langData = extractLanguageSplit(lang);
-  const acceptStr = JSON.stringify(progress).toLowerCase();
-  const beatMatch = acceptStr.match(/beat[\s_-]?(\d+\.?\d*)%?/);
-  const beat = beatMatch ? `${beatMatch[1]}%` : '—';
-
-  type SubRow = { title?: string; titleSlug?: string; timestamp?: string; lang?: string };
-
-  function extractSubs(root: unknown): SubRow[] {
-    const rows: SubRow[] = [];
-    const visit = (node: unknown, depth = 0): void => {
-      if (depth > 18 || node == null) return;
-      if (Array.isArray(node)) {
-        node.forEach((x) => visit(x, depth + 1));
-        return;
-      }
-      if (typeof node !== 'object') return;
-      const o = node as Record<string, unknown>;
-      if (typeof o.title === 'string' && (o.timestamp || o.statusDisplay)) {
-        rows.push({
-          title: o.title,
-          titleSlug: typeof o.titleSlug === 'string' ? o.titleSlug : undefined,
-          timestamp: String(o.timestamp || o.date || ''),
-          lang: typeof o.lang === 'string' ? o.lang : typeof o.language === 'string' ? o.language : undefined,
-        });
-      }
-      for (const v of Object.values(o)) visit(v, depth + 1);
-    };
-    visit(root);
-    return rows.slice(0, 10);
+  if (loading) {
+    return <div className="h-48 animate-pulse rounded-xl bg-white/5" />;
   }
 
-  const subRows = extractSubs(subs);
-
-  if (err) {
+  if (firstErr?.code === 'NO_LC_USER') {
     return (
-      <div className="card">
-        <h2>Progress</h2>
-        <div className="banner error">{err}</div>
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5 text-sm text-[var(--muted)]">
+        Set your LeetCode username in Settings.
       </div>
     );
   }
 
+  if (firstErr) {
+    return (
+      <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
+        {firstErr.message}
+      </div>
+    );
+  }
+
+  const unwrap = (box: { data?: unknown } | undefined): unknown => {
+    const d = box?.data;
+    if (d && typeof d === 'object' && d !== null && 'data' in d) {
+      return (d as { data: unknown }).data;
+    }
+    return d;
+  };
+  const skillRoot = unwrap(skQ.data);
+  const langRoot = unwrap(lgQ.data);
+  const subsRoot = unwrap(acQ.data);
+  const progressRoot = unwrap(prQ.data);
+
+  const radarData = extractRadarTopics(skillRoot).map((r) => ({
+    topic: r.topic.slice(0, 14),
+    strength: r.value,
+  }));
+  const langData = extractLanguageSplit(langRoot);
+  const subRows = extractSubs(subsRoot);
+  const acceptStr = JSON.stringify(progressRoot).toLowerCase();
+  const beatMatch = acceptStr.match(/beat[\s_-]?(\d+\.?\d*)%?/);
+  const beat = beatMatch ? `${beatMatch[1]}%` : '—';
+
+  const stale = results.some((r) => r.data?.stale?.stale);
+
   return (
-    <div>
-      <StaleBanner meta={meta} />
+    <div className="space-y-4">
+      <StaleBanner stale={stale} />
       {radarData.length === 0 && langData.length === 0 ? (
-        <div className="card">
-          <h2>Getting started</h2>
-          <p className="muted">Solve a few problems with a public profile to unlock radar and language charts.</p>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5 text-sm text-[var(--muted)]">
+          Solve a few problems with a public profile to unlock radar and language charts.
         </div>
       ) : null}
-      <div className="grid-2">
-        <div className="card">
-          <h2>Skill radar</h2>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
+          <h2 className="text-base font-semibold">Skill radar</h2>
           {radarData.length === 0 ? (
-            <p className="muted">No skill buckets detected yet.</p>
+            <p className="mt-2 text-sm text-[var(--muted)]">No skill buckets detected yet.</p>
           ) : (
-            <div style={{ width: '100%', height: 280 }}>
+            <div className="mt-2 h-72 w-full">
               <ResponsiveContainer>
                 <RadarChart data={radarData}>
                   <PolarGrid />
@@ -125,12 +149,12 @@ export function ProgressPage() {
             </div>
           )}
         </div>
-        <div className="card">
-          <h2>Languages</h2>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
+          <h2 className="text-base font-semibold">Languages</h2>
           {langData.length === 0 ? (
-            <p className="muted">No language stats yet.</p>
+            <p className="mt-2 text-sm text-[var(--muted)]">No language stats yet.</p>
           ) : (
-            <div style={{ width: '100%', height: 280 }}>
+            <div className="mt-2 h-72 w-full">
               <ResponsiveContainer>
                 <PieChart>
                   <Pie data={langData} dataKey="value" nameKey="name" outerRadius={100} label>
@@ -145,25 +169,25 @@ export function ProgressPage() {
           )}
         </div>
       </div>
-      <div className="card">
-        <h2>Beat % vs global</h2>
-        <p>
-          Acceptance snapshot (heuristic parse): <strong>{beat}</strong>
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
+        <h2 className="text-base font-semibold">Beat % vs global</h2>
+        <p className="text-sm">
+          Acceptance snapshot (heuristic): <strong>{beat}</strong>
         </p>
-        <pre className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: '0.75rem', maxHeight: 160, overflow: 'auto' }}>
-          {JSON.stringify(progress, null, 2).slice(0, 4000)}
+        <pre className="mt-2 max-h-40 overflow-auto text-xs text-[var(--muted)]">
+          {JSON.stringify(progressRoot, null, 2).slice(0, 4000)}
         </pre>
       </div>
-      <div className="card">
-        <h2>Recent accepted submissions</h2>
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
+        <h2 className="text-base font-semibold">Recent accepted submissions</h2>
         {subRows.length === 0 ? (
-          <p className="muted">No recent AC submissions found.</p>
+          <p className="mt-2 text-sm text-[var(--muted)]">No recent AC submissions found.</p>
         ) : (
-          <ul style={{ paddingLeft: '1.1rem', margin: 0 }}>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
             {subRows.map((s, i) => (
-              <li key={i} style={{ marginBottom: '0.35rem' }}>
+              <li key={i}>
                 <strong>{s.title || 'Problem'}</strong>{' '}
-                <span className="muted">
+                <span className="text-[var(--muted)]">
                   {s.lang || ''} {s.timestamp ? `· ${s.timestamp}` : ''}
                 </span>
               </li>

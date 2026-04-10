@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { ApiError, apiFetch } from '../lib/api';
+import { api, getStaleMeta } from '../lib/api';
 import { StaleBanner } from '../components/StaleBanner';
 
 type HistoryRow = {
   title?: string;
   rank?: number;
   rating?: number;
-  trendDirection?: string;
   date?: string;
 };
 
@@ -26,8 +26,12 @@ function extractHistory(root: unknown): HistoryRow[] {
       rows.push({
         title: typeof c.title === 'string' ? c.title : undefined,
         rank: typeof o.rank === 'number' ? o.rank : undefined,
-        rating: typeof o.rating === 'number' ? o.rating : typeof o.newRating === 'number' ? o.newRating : undefined,
-        trendDirection: typeof o.trendDirection === 'string' ? o.trendDirection : undefined,
+        rating:
+          typeof o.rating === 'number'
+            ? o.rating
+            : typeof o.newRating === 'number'
+              ? o.newRating
+              : undefined,
         date: typeof o.finishTime === 'string' ? o.finishTime : undefined,
       });
     }
@@ -38,34 +42,31 @@ function extractHistory(root: unknown): HistoryRow[] {
 }
 
 export function ContestPage() {
-  const [contest, setContest] = useState<unknown>(null);
-  const [history, setHistory] = useState<unknown>(null);
-  const [meta, setMeta] = useState<{ stale?: boolean; staleReason?: string }>({});
-  const [err, setErr] = useState<string | null>(null);
-  const [noUser, setNoUser] = useState(false);
+  const contestQ = useQuery({
+    queryKey: ['leetcode', 'me', 'contest'],
+    queryFn: async () => {
+      const res = await api.get('/api/leetcode/me/contest');
+      return { body: res.data, stale: getStaleMeta(res.headers) };
+    },
+  });
 
-  useEffect(() => {
-    (async () => {
-      setErr(null);
-      try {
-        const [c, h] = await Promise.all([
-          apiFetch<unknown>('/api/leetcode/me/contest'),
-          apiFetch<unknown>('/api/leetcode/me/contest/history'),
-        ]);
-        setContest(c.data);
-        setHistory(h.data);
-        setMeta({ stale: !!(c.meta.stale || h.meta.stale), staleReason: c.meta.staleReason });
-      } catch (e) {
-        if (e instanceof ApiError && e.code === 'NO_LC_USER') {
-          setNoUser(true);
-          return;
-        }
-        setErr(e instanceof Error ? e.message : 'Failed to load contests');
-      }
-    })();
-  }, []);
+  const historyQ = useQuery({
+    queryKey: ['leetcode', 'me', 'contest-history'],
+    queryFn: async () => {
+      const res = await api.get('/api/leetcode/me/contest/history');
+      return { body: res.data, stale: getStaleMeta(res.headers) };
+    },
+  });
 
-  const rows = useMemo(() => extractHistory(history).slice(0, 80), [history]);
+  const loading = contestQ.isLoading || historyQ.isLoading;
+  const err = (contestQ.error || historyQ.error) as Error & { code?: string } | undefined;
+
+  const rows = useMemo(() => {
+    const wrap = historyQ.data?.body as { data?: unknown } | undefined;
+    const raw = wrap?.data ?? wrap;
+    return extractHistory(raw).slice(0, 80);
+  }, [historyQ.data]);
+
   const chartData = useMemo(
     () =>
       rows
@@ -78,60 +79,66 @@ export function ContestPage() {
     [rows]
   );
 
-  const ratingStr = JSON.stringify(contest);
-  const ratingMatch = ratingStr.match(/"rating"\s*:\s*(\d+)/);
-  const rating = ratingMatch ? Number(ratingMatch[1]) : undefined;
+  if (loading) {
+    return <div className="h-48 animate-pulse rounded-xl bg-white/5" />;
+  }
 
-  if (noUser) {
+  if (err?.code === 'NO_LC_USER') {
     return (
-      <div className="card">
-        <h2>Contest</h2>
-        <p className="muted">Set your LeetCode username in Settings to load contest stats.</p>
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5 text-sm text-[var(--muted)]">
+        Set your LeetCode username in Settings to load contest stats.
       </div>
     );
   }
 
-  if (err) {
+  if (contestQ.isError || historyQ.isError) {
     return (
-      <div className="card">
-        <h2>Contest</h2>
-        <div className="banner error">{err}</div>
+      <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
+        {(err as Error).message}
       </div>
     );
   }
 
   if (rows.length === 0) {
     return (
-      <div className="card">
-        <h2>Contest</h2>
-        <p>No contests yet — when you participate, rating history and tables will appear here.</p>
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
+        <h2 className="text-base font-semibold">Contest</h2>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          No contests yet — when you participate, rating history will show here.
+        </p>
       </div>
     );
   }
 
+  const contestWrap = contestQ.data?.body as { data?: unknown } | undefined;
+  const contestInner = contestWrap?.data ?? contestWrap;
+  const ratingStr = JSON.stringify(contestInner);
+  const ratingMatch = ratingStr.match(/"rating"\s*:\s*(\d+)/);
+  const rating = ratingMatch ? Number(ratingMatch[1]) : undefined;
+  const stale = !!(contestQ.data?.stale.stale || historyQ.data?.stale.stale);
+
   return (
-    <div>
-      <StaleBanner meta={meta} />
-      <div className="grid-2">
-        <div className="card">
-          <h2>Current rating</h2>
-          <p style={{ fontSize: '2rem', fontWeight: 800 }}>{rating ?? '—'}</p>
-          <p className="muted">Tier badges use LeetCode&apos;s contest tiers; we show your numeric rating from synced data.</p>
+    <div className="space-y-4">
+      <StaleBanner stale={stale} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
+          <h2 className="text-base font-semibold">Current rating</h2>
+          <p className="mt-2 text-4xl font-extrabold">{rating ?? '—'}</p>
+          <p className="mt-2 text-sm text-[var(--muted)]">Numeric rating from synced contest payload.</p>
         </div>
-        <div className="card">
-          <h2>Top %</h2>
-          <p className="muted">Global rank and percentile are available on your LeetCode profile; contest payload below includes contest-specific ranks.</p>
-          <pre className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: '0.75rem', maxHeight: 200, overflow: 'auto' }}>
-            {JSON.stringify(contest, null, 2).slice(0, 4000)}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
+          <h2 className="text-base font-semibold">Raw contest payload</h2>
+          <pre className="mt-2 max-h-48 overflow-auto text-xs text-[var(--muted)]">
+            {ratingStr.slice(0, 4000)}
           </pre>
         </div>
       </div>
-      <div className="card">
-        <h2>Rating over time</h2>
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
+        <h2 className="text-base font-semibold">Rating over time</h2>
         {chartData.length === 0 ? (
-          <p className="muted">Could not chart rating — raw history is still listed below.</p>
+          <p className="mt-2 text-sm text-[var(--muted)]">Could not chart rating — see history below.</p>
         ) : (
-          <div style={{ width: '100%', height: 280 }}>
+          <div className="mt-2 h-72 w-full">
             <ResponsiveContainer>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a36" />
@@ -144,16 +151,19 @@ export function ContestPage() {
           </div>
         )}
       </div>
-      <div className="card">
-        <h2>Contest history</h2>
-        <div className="problem-list">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
+        <h2 className="text-base font-semibold">Contest history</h2>
+        <div className="mt-2 max-h-[28rem] space-y-2 overflow-auto text-sm">
           {rows.slice(0, 40).map((r, i) => (
-            <div key={i} className="problem-row">
+            <div
+              key={i}
+              className="flex items-start justify-between gap-3 border-b border-[var(--border)] py-2 last:border-0"
+            >
               <div>
                 <strong>{r.title || 'Contest'}</strong>
-                <div className="muted">{r.date || ''}</div>
+                <div className="text-xs text-[var(--muted)]">{r.date || ''}</div>
               </div>
-              <div className="muted" style={{ textAlign: 'right' }}>
+              <div className="text-right text-xs text-[var(--muted)]">
                 rank {r.rank ?? '—'}
                 <br />
                 rating {r.rating ?? '—'}
