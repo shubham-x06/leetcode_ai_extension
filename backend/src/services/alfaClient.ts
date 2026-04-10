@@ -4,10 +4,7 @@ import { env } from '../config/env';
 
 export type AlfaStaleReason = 'network' | 'rate_limit' | 'server_error';
 
-/** Primary cache: 600s TTL per system design */
 const alfaCache = new NodeCache({ stdTTL: 600, checkperiod: 120, useClones: false });
-
-/** Last successful payloads for stale fallback when Alfa is down */
 const staleFallback = new Map<string, unknown>();
 
 function isPrivateProfileError(err: unknown): boolean {
@@ -25,12 +22,22 @@ export interface AlfaFetchResult<T = unknown> {
   staleReason?: AlfaStaleReason;
 }
 
+export function secondsUntilNextUtcMidnight(): number {
+  const now = new Date();
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0));
+  return Math.max(1, Math.floor((next.getTime() - now.getTime()) / 1000));
+}
+
 /**
- * GET against Alfa LeetCode API — proxied only through backend (node-cache + stale fallback).
+ * GET against Alfa with configurable TTL (default 600s). Uses node-cache `set(key, val, ttl)`.
  */
-export async function alfaGet<T = unknown>(path: string): Promise<AlfaFetchResult<T>> {
-  const key = path.startsWith('/') ? path : `/${path}`;
-  const url = `${env.alfaApiBaseUrl}${key}`;
+export async function alfaGet<T = unknown>(
+  path: string,
+  options?: { ttlSeconds?: number }
+): Promise<AlfaFetchResult<T>> {
+  const ttl = options?.ttlSeconds ?? 600;
+  const key = `${ttl}:${path.startsWith('/') ? path : `/${path}`}`;
+  const url = `${env.alfaApiBaseUrl}${path.startsWith('/') ? path : `/${path}`}`;
 
   const hit = alfaCache.get<T>(key);
   if (hit !== undefined) {
@@ -48,7 +55,7 @@ export async function alfaGet<T = unknown>(path: string): Promise<AlfaFetchResul
     if (typeof bodyStatus === 'number' && bodyStatus >= 400) {
       throw new Error(`Alfa error status ${bodyStatus}`);
     }
-    alfaCache.set(key, data);
+    alfaCache.set(key, data, ttl);
     staleFallback.set(key, data);
     return { data, stale: false };
   } catch (err) {
@@ -70,14 +77,4 @@ export async function alfaGet<T = unknown>(path: string): Promise<AlfaFetchResul
     }
     throw err;
   }
-}
-
-export function extractAlfaErrorMessage(data: unknown): string | undefined {
-  if (!data || typeof data !== 'object') return undefined;
-  const d = data as Record<string, unknown>;
-  if (typeof d.message === 'string') return d.message;
-  if (Array.isArray(d.errors) && d.errors[0] && typeof (d.errors[0] as { message?: string }).message === 'string') {
-    return (d.errors[0] as { message: string }).message;
-  }
-  return undefined;
 }

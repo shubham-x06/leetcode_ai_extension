@@ -10,12 +10,12 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     return;
   }
   try {
-    const { sub } = verifyUserToken(token);
-    if (!mongoose.Types.ObjectId.isValid(sub)) {
+    const { userId } = verifyUserToken(token);
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
       res.status(401).json({ error: 'Invalid token', code: 'INVALID_TOKEN' });
       return;
     }
-    req.userId = new mongoose.Types.ObjectId(sub);
+    req.userId = new mongoose.Types.ObjectId(userId);
     next();
   } catch {
     res.status(401).json({ error: 'Token expired or invalid', code: 'JWT_INVALID' });
@@ -30,9 +30,9 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction): v
     return;
   }
   try {
-    const { sub } = verifyUserToken(token);
-    if (mongoose.Types.ObjectId.isValid(sub)) {
-      req.userId = new mongoose.Types.ObjectId(sub);
+    const { userId } = verifyUserToken(token);
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      req.userId = new mongoose.Types.ObjectId(userId);
     }
   } catch {
     /* ignore */

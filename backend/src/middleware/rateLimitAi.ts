@@ -14,8 +14,8 @@ export const aiRateLimiter = rateLimit({
   },
   handler: (_req, res) => {
     res.status(429).json({
-      error: 'Too many AI requests, try again in a minute',
-      code: 'AI_RATE_LIMIT_WINDOW',
+      error: 'Too many requests',
+      retryAfter: 60,
     });
   },
 });

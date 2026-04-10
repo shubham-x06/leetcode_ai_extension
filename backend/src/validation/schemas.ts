@@ -1,50 +1,52 @@
 import { z } from 'zod';
 
-export const googleAuthBodySchema = z.object({
-  accessToken: z.string().min(1, 'accessToken required'),
+export const googleAuthBodySchema = z
+  .object({
+    token: z.string().min(1).optional(),
+    accessToken: z.string().min(1).optional(),
+  })
+  .refine((d) => !!(d.token || d.accessToken), { message: 'token or accessToken required' });
+
+export const linkLeetcodeBodySchema = z.object({
+  leetcodeUsername: z
+    .string()
+    .min(3)
+    .max(25)
+    .regex(/^[a-zA-Z0-9_]+$/, 'username must be alphanumeric with underscores'),
 });
 
 export const hintBodySchema = z.object({
   problemDescription: z.string().min(1),
   userCode: z.string(),
   language: z.string().min(1),
-  weakTopics: z.array(z.string()).optional(),
+  problemSlug: z.string().optional(),
 });
 
 export const solutionBodySchema = z.object({
   problemDescription: z.string().min(1),
   userCode: z.string().optional(),
   language: z.string().min(1),
-  weakTopics: z.array(z.string()).optional(),
 });
 
-export const analyzeCodeBodySchema = z.object({
+export const analyzeBodySchema = z.object({
   problemDescription: z.string().min(1),
   userCode: z.string().min(1),
   language: z.string().min(1),
-  weakTopics: z.array(z.string()).optional(),
+});
+
+export const preferencesPatchSchema = z.object({
+  targetDifficulty: z.enum(['Easy', 'Medium', 'Hard', 'Mixed']).optional(),
+  dailyGoalCount: z.number().int().min(1).max(5).optional(),
+  preferredLanguage: z.string().optional(),
+  theme: z.enum(['light', 'dark']).optional(),
 });
 
 export const bookmarkCreateSchema = z.object({
   titleSlug: z.string().min(1),
   title: z.string().min(1),
-  difficulty: z.string().min(1),
+  difficulty: z.enum(['Easy', 'Medium', 'Hard']),
 });
 
 export const studyPlanBodySchema = z.object({
   topic: z.string().min(1),
-});
-
-export const postSolveBodySchema = z.object({
-  problemTitle: z.string().optional(),
-  code: z.string().min(1),
-  language: z.string().min(1),
-});
-
-export const patchUserBodySchema = z.object({
-  leetcodeUsername: z.string().optional(),
-  preferredLanguage: z.string().optional(),
-  targetDifficulty: z.enum(['EASY', 'MEDIUM', 'HARD', 'MIXED']).optional(),
-  dailyGoal: z.number().int().min(1).max(5).optional(),
-  theme: z.enum(['light', 'dark']).optional(),
 });

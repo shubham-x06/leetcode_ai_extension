@@ -17,10 +17,13 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   }
 
   if (err instanceof ZodError) {
+    const details = err.errors.map((e) => {
+      const path = e.path.length ? e.path.join('.') : 'body';
+      return `${path}: ${e.message}`;
+    });
     res.status(400).json({
       error: 'Validation failed',
-      code: 'VALIDATION',
-      details: err.flatten(),
+      details,
     });
     return;
   }

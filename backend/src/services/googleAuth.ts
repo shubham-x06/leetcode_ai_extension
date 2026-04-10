@@ -9,8 +9,38 @@ export interface GoogleUserInfo {
 }
 
 /**
- * Verifies a Chrome `chrome.identity.getAuthToken` access token and returns user info.
- * Optionally checks audience when GOOGLE_CLIENT_ID is set (recommended).
+ * Verifies a Google ID token (JWT) via tokeninfo.
+ */
+export async function verifyGoogleIdToken(idToken: string): Promise<GoogleUserInfo> {
+  const { data } = await axios.get<{
+    sub?: string;
+    email?: string;
+    name?: string;
+    picture?: string;
+    aud?: string;
+    error?: string;
+  }>('https://oauth2.googleapis.com/tokeninfo', {
+    params: { id_token: idToken },
+    timeout: 15000,
+  });
+
+  if (data.error || !data.sub || !data.email) {
+    throw new Error('Invalid Google ID token');
+  }
+  if (env.googleClientId && data.aud && data.aud !== env.googleClientId) {
+    throw new Error('Token audience mismatch');
+  }
+
+  return {
+    sub: data.sub,
+    email: data.email,
+    name: data.name,
+    picture: data.picture,
+  };
+}
+
+/**
+ * Verifies a Chrome `chrome.identity.getAuthToken` access token.
  */
 export async function verifyGoogleAccessToken(accessToken: string): Promise<GoogleUserInfo> {
   if (env.googleClientId) {
