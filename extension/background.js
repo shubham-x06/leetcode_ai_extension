@@ -1,17 +1,19 @@
-// Background script for handling OAuth and storage
 chrome.runtime.onInstalled.addListener(() => {
   console.log('LeetCode AI Extension installed');
 });
 
-// Handle OAuth token
-chrome.identity.onSignInChanged.addListener((account, signedIn) => {
-  if (signedIn) {
-    chrome.identity.getAuthToken({ interactive: false }, (token) => {
-      if (token) {
-        chrome.storage.local.set({ authToken: token });
-      }
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'GET_AUTH_TOKEN') {
+    chrome.storage.local.get(['authToken'], (result) => {
+      sendResponse({ token: result.authToken || null });
     });
-  } else {
-    chrome.storage.local.remove('authToken');
+    return true; // Indicates async response
+  }
+  
+  if (message.type === 'LOGOUT') {
+    chrome.storage.local.remove('authToken', () => {
+      sendResponse({ success: true });
+    });
+    return true;
   }
 });
