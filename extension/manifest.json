@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "LeetCode AI Extension",
+  "version": "1.0",
+  "description": "AI-powered LeetCode companion",
+  "permissions": [
+    "storage",
+    "identity",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://leetcode.com/*",
+    "http://localhost:3001/*"
+  ],
+  "oauth2": {
+    "client_id": "YOUR_GOOGLE_OAUTH_WEB_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": ["openid", "email", "profile"]
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://leetcode.com/problems/*"],
+      "js": ["content_script.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LeetCode AI"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["widget.html", "widget.js", "widget.css"],
+      "matches": ["https://leetcode.com/*"]
+    }
+  ]
+}
