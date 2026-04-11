@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { verifyUserToken } from '../services/jwt';
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
@@ -11,8 +11,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
   
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
-    req.userId = (payload as { userId: string }).userId;
+    const payload = verifyUserToken(token);
+    req.userId = payload.userId;
     next();
   } catch (err) {
     res.status(401).json({ error: 'Invalid or expired token', code: 'AUTH_INVALID_TOKEN' });
@@ -27,8 +27,8 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction): v
     return;
   }
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
-    req.userId = (payload as { userId: string }).userId;
+    const payload = verifyUserToken(token);
+    req.userId = payload.userId;
   } catch {
     /* ignore */
   }

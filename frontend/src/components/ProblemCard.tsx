@@ -1,6 +1,6 @@
 import { Bookmark, BookmarkCheck } from 'lucide-react';
-import Button from './ui/Button';
-import Card from './ui/Card';
+import { Card } from './ui/Card';
+import { Button } from './ui/Button';
 
 interface ProblemCardProps {
   title: string;
@@ -42,7 +42,7 @@ export default function ProblemCard({
   };
 
   return (
-    <Card className="hover:shadow-md transition">
+    <Card className="p-4 hover:shadow-md transition">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
@@ -75,7 +75,7 @@ export default function ProblemCard({
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className={`px-3 py-1 rounded text-sm font-medium within-fit ${getDifficultyColor(difficulty)}`}>
+          <span className={`px-3 py-1 rounded text-sm font-medium ${getDifficultyColor(difficulty)}`}>
             {difficulty}
           </span>
           <button

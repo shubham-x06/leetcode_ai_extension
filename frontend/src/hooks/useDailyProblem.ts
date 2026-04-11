@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getDaily } from '../api/problems';
+import { getDailyProblem } from '../api/problems';
 import { useAuthStore } from '../store/useAuthStore';
 
 export function useDailyProblem() {
@@ -7,6 +7,7 @@ export function useDailyProblem() {
   return useQuery({
     queryKey: ['problems', 'daily'],
     enabled: !!token,
-    queryFn: getDaily,
+    queryFn: getDailyProblem,
+    staleTime: 3_600_000,
   });
 }
