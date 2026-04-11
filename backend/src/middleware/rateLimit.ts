@@ -8,7 +8,10 @@ export const aiRateLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.userId || req.ip || 'unknown',
+  keyGenerator: (req) => {
+    const id = (req as any).userId;
+    return id ? `ai-${id}` : `ai-ip-${req.ip}`;
+  },
   handler: (_req, res) => {
     res.status(429).json({
       error: 'Too many requests',

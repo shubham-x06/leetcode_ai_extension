@@ -50,5 +50,5 @@ mongoose.connect(process.env.MONGODB_URI!)
   })
   .catch((err) => {
     console.error('MongoDB connection failed:', err.message);
-    process.exit(1);
+    console.log('Running without DB connection (Demo mode)');
   });
