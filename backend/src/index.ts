@@ -26,29 +26,29 @@ app.use(cors({
 
 app.use(express.json());
 
+const port = process.env.PORT || 3001;
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.use('/api/auth', publicAuthRouter);
+app.use('/api/auth', requireAuth, protectedAuthRouter);
+app.use('/api/user', requireAuth, userRouter);
+app.use('/api/problems', requireAuth, problemsRouter);
+app.use('/api/ai', requireAuth, aiRateLimiter, aiRouter);
+
+app.use(errorHandler);
+
 mongoose.connect(process.env.MONGODB_URI!)
   .then(() => {
     console.info('MongoDB connected');
-    
-    app.get('/api/health', (req, res) => {
-      res.json({ status: 'ok', timestamp: new Date().toISOString() });
-    });
-
-    app.use('/api/auth', publicAuthRouter);
-
-    app.use('/api/auth', requireAuth, protectedAuthRouter);
-    app.use('/api/user', requireAuth, userRouter);
-    app.use('/api/problems', requireAuth, problemsRouter);
-    app.use('/api/ai', requireAuth, aiRateLimiter, aiRouter);
-
-    app.use(errorHandler);
-
-    const port = process.env.PORT || 3001;
-    app.listen(port, () => {
-      console.info(`Server running at http://localhost:${port}`);
-    });
   })
   .catch((err) => {
     console.error('MongoDB connection failed:', err.message);
     console.log('Running without DB connection (Demo mode)');
   });
+
+app.listen(port, () => {
+  console.info(`Server running at http://localhost:${port}`);
+});
