@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { AppError } from '../errors/AppError';
-import { asyncHandler } from '../utils/asyncHandler';
-import { alfaGet, secondsUntilNextUtcMidnight } from '../services/alfaClient';
+import { asyncHandler } from '../lib/asyncHandler';
+import { alfaGet, secondsUntilNextUtcMidnight } from '../services/alfaApi';
 import { extractProblemsArray, extractTotalCount } from '../services/alfaProblems';
 
 export const problemsRouter = Router();

@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { AppError } from '../errors/AppError';
-import { asyncHandler } from '../utils/asyncHandler';
+import { asyncHandler } from '../lib/asyncHandler';
 import { validateBody } from '../middleware/validate';
 import { analyzeBodySchema, hintBodySchema, solutionBodySchema } from '../validation/schemas';
 import { User } from '../models/User';
-import { chatTextStream, mapGroqError, normalizeSolutionCode } from '../services/groqAi';
-import { alfaGet } from '../services/alfaClient';
+import { chatTextStream, mapGroqError, normalizeSolutionCode } from '../services/groq';
+import { alfaGet } from '../services/alfaApi';
 import { getWeakTopicsForUser } from '../services/userContext';
-import { readSolvedProblemCount } from '../services/weakTopics';
+import { readSolvedProblemCount } from '../lib/computeWeakTopics';
 import { getOrBuildDailyGoal } from '../services/dailyGoalService';
 import { extractProblemsArray, toSlimProblems } from '../services/alfaProblems';
 

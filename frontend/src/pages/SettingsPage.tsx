@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { api } from '../lib/api';
-import { useSessionStore, type SessionUser, type UserPreferences } from '../store/sessionStore';
+import { linkLeetCode } from '../api/auth';
+import { getMe, patchPreferences } from '../api/user';
+import { useAuthStore, type AuthUser, type UserPreferences } from '../store/useAuthStore';
+import { useUser } from '../hooks/useUser';
 
 const defaultPrefs = (): UserPreferences => ({
   targetDifficulty: 'Mixed',
@@ -14,27 +15,20 @@ const defaultPrefs = (): UserPreferences => ({
 
 export function SettingsPage() {
   const navigate = useNavigate();
-  const applyTheme = useSessionStore((s) => s.applyTheme);
-  const setApiBaseUrlStore = useSessionStore((s) => s.setApiBaseUrl);
-  const clearSession = useSessionStore((s) => s.clearSession);
-  const setSession = useSessionStore((s) => s.setSession);
-  const jwt = useSessionStore((s) => s.jwt);
+  const applyTheme = useAuthStore((s) => s.applyTheme);
+  const setApiBaseUrlStore = useAuthStore((s) => s.setApiBaseUrl);
+  const logout = useAuthStore((s) => s.logout);
+  const setSession = useAuthStore((s) => s.setSession);
+  const token = useAuthStore((s) => s.token);
 
-  const meQ = useQuery({
-    queryKey: ['user', 'me'],
-    enabled: !!jwt,
-    queryFn: async () => {
-      const res = await api.get<SessionUser>('/api/user/me');
-      return res.data;
-    },
-  });
+  const meQ = useUser();
 
   const [apiBase, setApiBase] = useState('');
-  const [me, setMe] = useState<SessionUser | null>(null);
+  const [me, setMe] = useState<AuthUser | null>(null);
   const [leetcodeInput, setLeetcodeInput] = useState('');
 
   useEffect(() => {
-    const base = useSessionStore.getState().apiBaseUrl;
+    const base = useAuthStore.getState().apiBaseUrl;
     setApiBase(base);
   }, []);
 
@@ -51,7 +45,7 @@ export function SettingsPage() {
 
   async function saveProfile() {
     try {
-      await api.patch('/api/user/preferences', {
+      await patchPreferences({
         targetDifficulty: prefs.targetDifficulty,
         dailyGoalCount: prefs.dailyGoalCount,
         preferredLanguage: prefs.preferredLanguage,
@@ -59,11 +53,11 @@ export function SettingsPage() {
       });
       const trimmed = leetcodeInput.trim();
       if (trimmed) {
-        await api.post('/api/auth/link-leetcode', { leetcodeUsername: trimmed });
+        await linkLeetCode(trimmed);
       }
       await setApiBaseUrlStore(apiBase);
-      const fresh = await api.get<SessionUser>('/api/user/me');
-      if (jwt) await setSession(jwt, fresh.data);
+      const fresh = await getMe();
+      if (token) await setSession(token, fresh);
       toast.success('Saved.');
     } catch (e) {
       const err = e as Error & { code?: string };
@@ -76,7 +70,7 @@ export function SettingsPage() {
   }
 
   async function signOut() {
-    await clearSession();
+    await logout();
     navigate('/login');
   }
 

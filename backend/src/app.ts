@@ -2,12 +2,11 @@ import express, { Router } from 'express';
 import cors from 'cors';
 import { requireAuth } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
-import { aiRateLimiter } from './middleware/rateLimitAi';
-import { authRouter } from './routes/authRoutes';
-import { protectedAuthRouter } from './routes/protectedAuthRoutes';
-import { userRouter } from './routes/userRoutes';
-import { problemsRouter } from './routes/problemsRoutes';
-import { aiRouter } from './routes/aiRoutes';
+import { aiRateLimiter } from './middleware/rateLimit';
+import { publicAuthRouter, protectedAuthRouter } from './routes/auth';
+import { userRouter } from './routes/user';
+import { problemsRouter } from './routes/problems';
+import { aiRouter } from './routes/ai';
 
 export function createApp() {
   const app = express();
@@ -38,7 +37,7 @@ export function createApp() {
     res.json({ ok: true });
   });
 
-  app.use('/api/auth', authRouter);
+  app.use('/api/auth', publicAuthRouter);
 
   const protectedApi = Router();
   protectedApi.use(requireAuth);

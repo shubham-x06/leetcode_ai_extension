@@ -1,16 +1,16 @@
 import { Router } from 'express';
 import type { Types } from 'mongoose';
 import { AppError } from '../errors/AppError';
-import { asyncHandler } from '../utils/asyncHandler';
+import { asyncHandler } from '../lib/asyncHandler';
 import { validateBody } from '../middleware/validate';
 import {
   bookmarkCreateSchema,
   preferencesPatchSchema,
 } from '../validation/schemas';
 import { User, normalizeBookmarkDifficulty } from '../models/User';
-import { alfaGet } from '../services/alfaClient';
-import { parseSubmissionCalendarMap, streaksFromCalendarMap } from '../services/calendarStats';
-import { extractWeakestTopicsByProblemsSolved } from '../services/weakTopics';
+import { alfaGet } from '../services/alfaApi';
+import { parseSubmissionCalendarMap, streaksFromCalendarMap } from '../lib/computeStreaks';
+import { extractWeakestTopicsByProblemsSolved } from '../lib/computeWeakTopics';
 
 export const userRouter = Router();
 

@@ -1,10 +1,9 @@
 import axios, { type AxiosError } from 'axios';
-import NodeCache from 'node-cache';
 import { env } from '../config/env';
+import { alfaCacheGet, alfaCacheSet } from '../lib/cache';
 
 export type AlfaStaleReason = 'network' | 'rate_limit' | 'server_error';
 
-const alfaCache = new NodeCache({ stdTTL: 600, checkperiod: 120, useClones: false });
 const staleFallback = new Map<string, unknown>();
 
 function isPrivateProfileError(err: unknown): boolean {
@@ -29,7 +28,7 @@ export function secondsUntilNextUtcMidnight(): number {
 }
 
 /**
- * GET against Alfa with configurable TTL (default 600s). Uses node-cache `set(key, val, ttl)`.
+ * GET against Alfa with configurable TTL (default 600s). Uses shared node-cache.
  */
 export async function alfaGet<T = unknown>(
   path: string,
@@ -39,7 +38,7 @@ export async function alfaGet<T = unknown>(
   const key = `${ttl}:${path.startsWith('/') ? path : `/${path}`}`;
   const url = `${env.alfaApiBaseUrl}${path.startsWith('/') ? path : `/${path}`}`;
 
-  const hit = alfaCache.get<T>(key);
+  const hit = alfaCacheGet<T>(key);
   if (hit !== undefined) {
     return { data: hit, stale: false };
   }
@@ -55,7 +54,7 @@ export async function alfaGet<T = unknown>(
     if (typeof bodyStatus === 'number' && bodyStatus >= 400) {
       throw new Error(`Alfa error status ${bodyStatus}`);
     }
-    alfaCache.set(key, data, ttl);
+    alfaCacheSet(key, data, ttl);
     staleFallback.set(key, data);
     return { data, stale: false };
   } catch (err) {

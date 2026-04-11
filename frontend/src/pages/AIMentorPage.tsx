@@ -1,8 +1,10 @@
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
-import { api } from '../lib/api';
+import { analyzeCode, getDailyGoal, getRecommendation } from '../api/ai';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
 
-export function MentorPage() {
+export function AIMentorPage() {
   const [dailyGoals, setDailyGoals] = useState<string>('');
   const [nextProblem, setNextProblem] = useState<string>('');
   const [postAnalysis, setPostAnalysis] = useState('');
@@ -11,65 +13,47 @@ export function MentorPage() {
   const [postLang, setPostLang] = useState('Python3');
 
   const goalsM = useMutation({
-    mutationFn: async () => {
-      const res = await api.get<unknown>('/api/ai/daily-goal');
-      return res.data;
-    },
+    mutationFn: getDailyGoal,
     onSuccess: (data) => setDailyGoals(JSON.stringify(data, null, 2)),
   });
 
   const nextM = useMutation({
-    mutationFn: async () => {
-      const res = await api.get<unknown>('/api/ai/recommend');
-      return res.data;
-    },
+    mutationFn: getRecommendation,
     onSuccess: (data) => setNextProblem(JSON.stringify(data, null, 2)),
   });
 
   const postM = useMutation({
-    mutationFn: async () => {
-      const res = await api.post<Record<string, unknown>>('/api/ai/analyze', {
+    mutationFn: () =>
+      analyzeCode({
         problemDescription: postTitle || 'Problem context not provided.',
         userCode: postCode,
         language: postLang,
-      });
-      return res.data;
-    },
+      }),
     onSuccess: (data) => setPostAnalysis(JSON.stringify(data, null, 2)),
   });
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
+      <Card>
         <h2 className="text-base font-semibold">Daily goals</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">AI motivation + problems from your weak topics (cached until UTC midnight).</p>
-        <button
-          type="button"
-          className="mt-3 rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-[#0f0f12] disabled:opacity-50"
-          disabled={goalsM.isPending}
-          onClick={() => goalsM.mutate()}
-        >
+        <Button className="mt-3 px-3 py-2" disabled={goalsM.isPending} onClick={() => goalsM.mutate()}>
           {goalsM.isPending ? 'Working…' : 'Load daily goal'}
-        </button>
+        </Button>
         {dailyGoals ? (
           <pre className="mt-3 whitespace-pre-wrap text-xs text-[var(--muted)]">{dailyGoals}</pre>
         ) : null}
-      </div>
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
+      </Card>
+      <Card>
         <h2 className="text-base font-semibold">Next problem</h2>
-        <button
-          type="button"
-          className="mt-3 rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-[#0f0f12] disabled:opacity-50"
-          disabled={nextM.isPending}
-          onClick={() => nextM.mutate()}
-        >
+        <Button className="mt-3 px-3 py-2" disabled={nextM.isPending} onClick={() => nextM.mutate()}>
           {nextM.isPending ? 'Working…' : 'Recommend next'}
-        </button>
+        </Button>
         {nextProblem ? (
           <pre className="mt-3 whitespace-pre-wrap text-xs text-[var(--muted)]">{nextProblem}</pre>
         ) : null}
-      </div>
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5 md:col-span-2">
+      </Card>
+      <Card className="md:col-span-2">
         <h2 className="text-base font-semibold">Post-solve analysis</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">Structured JSON: complexity, tips, and topic reinforcement.</p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -97,18 +81,13 @@ export function MentorPage() {
           value={postCode}
           onChange={(e) => setPostCode(e.target.value)}
         />
-        <button
-          type="button"
-          className="mt-2 rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-[#0f0f12] disabled:opacity-50"
-          disabled={postM.isPending}
-          onClick={() => postM.mutate()}
-        >
+        <Button className="mt-2 px-3 py-2" disabled={postM.isPending} onClick={() => postM.mutate()}>
           {postM.isPending ? 'Analyzing…' : 'Analyze'}
-        </button>
+        </Button>
         {postAnalysis ? (
           <pre className="mt-3 whitespace-pre-wrap text-sm text-[var(--text)]">{postAnalysis}</pre>
         ) : null}
-      </div>
+      </Card>
     </div>
   );
 }

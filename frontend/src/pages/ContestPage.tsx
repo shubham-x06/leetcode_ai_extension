@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { api } from '../lib/api';
+import { useContest } from '../hooks/useContest';
 
 type HistoryRow = {
   title?: string;
@@ -41,13 +40,7 @@ function extractHistory(root: unknown): HistoryRow[] {
 }
 
 export function ContestPage() {
-  const contestQ = useQuery({
-    queryKey: ['user', 'contest'],
-    queryFn: async () => {
-      const res = await api.get<{ contestDetails: unknown; contestHistory: unknown }>('/api/user/contest');
-      return res.data;
-    },
-  });
+  const contestQ = useContest();
 
   const loading = contestQ.isLoading;
   const err = contestQ.error as Error & { code?: string } | undefined;

@@ -113,7 +113,6 @@ export function extractTotalSolvedCount(solvedPayload: unknown): number {
   };
   visit(solvedPayload);
   if (best > 0) return best;
-  /* fallback single field */
   const s = JSON.stringify(solvedPayload);
   const m = s.match(/"solvedProblem"\s*:\s*(\d+)/i);
   return m ? Number(m[1]) : 0;

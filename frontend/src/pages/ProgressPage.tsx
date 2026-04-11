@@ -1,19 +1,8 @@
-import { useQueries } from '@tanstack/react-query';
-import {
-  Cell,
-  Pie,
-  PieChart,
-  PolarAngleAxis,
-  PolarGrid,
-  Radar,
-  RadarChart,
-  ResponsiveContainer,
-  Tooltip,
-} from 'recharts';
-import { api } from '../lib/api';
 import { extractLanguageSplit, extractRadarTopics } from '../lib/stats';
-
-const PIE_COLORS = ['#7aa2f7', '#9ece6a', '#e0af68', '#f7768e', '#bb9af7', '#7dcfff'];
+import { useStats } from '../hooks/useStats';
+import { useSubmissions } from '../hooks/useSubmissions';
+import { SkillRadar } from '../components/charts/SkillRadar';
+import { LanguagePie } from '../components/charts/LanguagePie';
 
 type SubRow = { title?: string; timestamp?: string; lang?: string };
 
@@ -41,28 +30,11 @@ function extractSubs(root: unknown): SubRow[] {
 }
 
 export function ProgressPage() {
-  const results = useQueries({
-    queries: [
-      {
-        queryKey: ['user', 'stats'],
-        queryFn: async () => {
-          const res = await api.get('/api/user/stats');
-          return res.data;
-        },
-      },
-      {
-        queryKey: ['user', 'submissions'],
-        queryFn: async () => {
-          const res = await api.get('/api/user/submissions?limit=10');
-          return res.data;
-        },
-      },
-    ],
-  });
+  const statsQ = useStats();
+  const subsQ = useSubmissions(10);
 
-  const [statsQ, subsQ] = results;
-  const loading = results.some((r) => r.isLoading);
-  const firstErr = results.find((r) => r.isError)?.error as (Error & { code?: string }) | undefined;
+  const loading = statsQ.isLoading || subsQ.isLoading;
+  const firstErr = (statsQ.error || subsQ.error) as (Error & { code?: string }) | undefined;
 
   if (loading) {
     return <div className="h-48 animate-pulse rounded-xl bg-white/5" />;
@@ -84,18 +56,17 @@ export function ProgressPage() {
     );
   }
 
-  const stats = statsQ.data as { skills?: unknown; languages?: unknown } | undefined;
+  const stats = statsQ.data;
   const skillRoot = stats?.skills;
   const langRoot = stats?.languages;
-  const submissionsWrap = subsQ.data as { submissions?: unknown[] } | undefined;
-  const subsRoot = submissionsWrap?.submissions ?? subsQ.data;
+  const submissionsWrap = subsQ.data?.submissions ?? subsQ.data;
+  const subRows = Array.isArray(submissionsWrap) ? extractSubs(submissionsWrap) : extractSubs(submissionsWrap);
 
   const radarData = extractRadarTopics(skillRoot).map((r) => ({
     topic: r.topic.slice(0, 14),
     strength: r.value,
   }));
   const langData = extractLanguageSplit(langRoot);
-  const subRows = Array.isArray(subsRoot) ? extractSubs(subsRoot) : extractSubs(subsRoot);
 
   return (
     <div className="space-y-4">
@@ -107,39 +78,11 @@ export function ProgressPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
           <h2 className="text-base font-semibold">Skill radar</h2>
-          {radarData.length === 0 ? (
-            <p className="mt-2 text-sm text-[var(--muted)]">No skill buckets detected yet.</p>
-          ) : (
-            <div className="mt-2 h-72 w-full">
-              <ResponsiveContainer>
-                <RadarChart data={radarData}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="topic" />
-                  <Radar name="Strength" dataKey="strength" stroke="#7aa2f7" fill="#7aa2f7" fillOpacity={0.35} />
-                  <Tooltip />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          <SkillRadar data={radarData} />
         </div>
         <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">
           <h2 className="text-base font-semibold">Languages</h2>
-          {langData.length === 0 ? (
-            <p className="mt-2 text-sm text-[var(--muted)]">No language stats yet.</p>
-          ) : (
-            <div className="mt-2 h-72 w-full">
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie data={langData} dataKey="value" nameKey="name" outerRadius={100} label>
-                    {langData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          <LanguagePie data={langData} />
         </div>
       </div>
       <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5">

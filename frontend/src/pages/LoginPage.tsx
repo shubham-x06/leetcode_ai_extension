@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { api } from '../lib/api';
-import { useSessionStore, type SessionUser } from '../store/sessionStore';
+import { postGoogleLogin } from '../api/auth';
+import { useAuthStore, type AuthUser } from '../store/useAuthStore';
 
 function getGoogleAccessTokenViaBackground(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -25,13 +25,13 @@ function getGoogleAccessTokenViaBackground(): Promise<string> {
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const jwt = useSessionStore((s) => s.jwt);
-  const hydrated = useSessionStore((s) => s.hydrated);
-  const setSession = useSessionStore((s) => s.setSession);
+  const token = useAuthStore((s) => s.token);
+  const hydrated = useAuthStore((s) => s.hydrated);
+  const setSession = useAuthStore((s) => s.setSession);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  if (hydrated && jwt) {
+  if (hydrated && token) {
     return <Navigate to="/app/home" replace />;
   }
 
@@ -40,14 +40,10 @@ export function LoginPage() {
     setLoading(true);
     try {
       const accessToken = await getGoogleAccessTokenViaBackground();
-      const { data } = await api.post<{
-        token: string;
-        needsLeetCodeLink?: boolean;
-        user: SessionUser;
-      }>('/api/auth/google', { accessToken });
-      await setSession(data.token, data.user);
+      const data = await postGoogleLogin({ accessToken });
+      await setSession(data.token, data.user as AuthUser);
       if (data.needsLeetCodeLink) {
-        navigate('/app/settings');
+        navigate('/app/onboarding');
         return;
       }
       navigate('/app/home');
@@ -78,7 +74,7 @@ export function LoginPage() {
         {loading ? 'Signing in…' : 'Continue with Google'}
       </button>
       <p className="mt-4 text-xs text-[var(--muted)]">
-        After login, link your LeetCode username in Settings so we can load your public stats.
+        After login, link your LeetCode username so we can load your public stats.
       </p>
     </div>
   );

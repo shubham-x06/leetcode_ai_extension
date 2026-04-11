@@ -1,7 +1,7 @@
 import type { Types } from 'mongoose';
 import { User } from '../models/User';
-import { alfaGet } from './alfaClient';
-import { extractWeakTopics } from './weakTopics';
+import { alfaGet } from './alfaApi';
+import { extractWeakTopics } from '../lib/computeWeakTopics';
 
 export async function getWeakTopicsForUser(userId: Types.ObjectId): Promise<string[]> {
   const user = await User.findById(userId).lean();

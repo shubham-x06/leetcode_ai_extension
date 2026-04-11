@@ -2,8 +2,8 @@ import type { Types } from 'mongoose';
 import NodeCache from 'node-cache';
 import { AppError } from '../errors/AppError';
 import { User } from '../models/User';
-import { alfaGet, secondsUntilNextUtcMidnight } from './alfaClient';
-import { chatTextStream } from './groqAi';
+import { alfaGet, secondsUntilNextUtcMidnight } from './alfaApi';
+import { chatTextStream } from './groq';
 import { getWeakTopicsForUser } from './userContext';
 import {
   extractProblemsArray,

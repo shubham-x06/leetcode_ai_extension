@@ -1,48 +1,20 @@
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../lib/api';
 import {
   extractCalendarMap,
   extractSolvedCounts,
   extractWeakTags,
   streaksFromCalendar,
 } from '../lib/stats';
-import { useSessionStore } from '../store/sessionStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { useStats } from '../hooks/useStats';
+import { useDailyGoal } from '../hooks/useDailyGoal';
+import { useDailyProblem } from '../hooks/useDailyProblem';
 
 export function HomePage() {
-  const user = useSessionStore((s) => s.user);
-  const jwt = useSessionStore((s) => s.jwt);
+  const user = useAuthStore((s) => s.user);
 
-  const statsQ = useQuery({
-    queryKey: ['user', 'stats'],
-    enabled: !!jwt,
-    queryFn: async () => {
-      const res = await api.get<{
-        profile: unknown;
-        solved: unknown;
-        skills: unknown;
-        languages: unknown;
-      }>('/api/user/stats');
-      return res.data;
-    },
-  });
-
-  const dailyQ = useQuery({
-    queryKey: ['problems', 'daily'],
-    enabled: !!jwt,
-    queryFn: async () => {
-      const res = await api.get<{ problem: unknown }>('/api/problems/daily');
-      return res.data;
-    },
-  });
-
-  const dailyGoalQ = useQuery({
-    queryKey: ['ai', 'daily-goal'],
-    enabled: !!jwt && !!user?.leetcodeUsername,
-    queryFn: async () => {
-      const res = await api.get<{ motivation: string; problems: unknown[] }>('/api/ai/daily-goal');
-      return res.data;
-    },
-  });
+  const statsQ = useStats();
+  const dailyQ = useDailyProblem();
+  const dailyGoalQ = useDailyGoal();
 
   if (statsQ.isLoading) {
     return (

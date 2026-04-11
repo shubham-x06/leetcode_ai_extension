@@ -1,16 +1,17 @@
 import axios, { type AxiosError } from 'axios';
-import { useSessionStore } from '../store/sessionStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { DEFAULT_API_BASE_URL } from '../lib/constants';
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001',
+  baseURL: DEFAULT_API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use((config) => {
-  const { jwt, apiBaseUrl } = useSessionStore.getState();
+  const { token, apiBaseUrl } = useAuthStore.getState();
   if (apiBaseUrl) config.baseURL = apiBaseUrl;
-  if (jwt) {
-    config.headers.Authorization = `Bearer ${jwt}`;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -21,7 +22,7 @@ api.interceptors.response.use(
     const status = err.response?.status;
     const data = err.response?.data;
     if (status === 401) {
-      void useSessionStore.getState().clearSession();
+      void useAuthStore.getState().logout();
     }
     const message = data?.error || err.message || 'Request failed';
     return Promise.reject(

@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
-import { useSessionStore } from '../store/sessionStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,7 +25,7 @@ const queryClient = new QueryClient({
 });
 
 export function AppProviders({ children }: { children: ReactNode }) {
-  const hydrate = useSessionStore((s) => s.hydrate);
+  const hydrate = useAuthStore((s) => s.hydrate);
 
   useEffect(() => {
     void hydrate();

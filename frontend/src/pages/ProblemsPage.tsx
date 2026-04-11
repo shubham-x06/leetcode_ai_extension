@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
-import type { SessionUser } from '../store/sessionStore';
+import { getOfficialSolution, getProblemList } from '../api/problems';
+import { addBookmark, removeBookmark } from '../api/user';
+import { useUser } from '../hooks/useUser';
+import type { AuthUser } from '../store/useAuthStore';
 
 type Problem = {
   title?: string;
@@ -65,18 +67,11 @@ export function ProblemsPage() {
       if (tags.trim()) q.set('tags', tags.trim().replace(/\s+/g, '+').replace(/,/g, '+'));
       if (search.trim()) q.set('search', search.trim());
       q.set('limit', '40');
-      const res = await api.get<{ problems?: unknown[]; total?: number }>(`/api/problems/list?${q.toString()}`);
-      return res.data;
+      return getProblemList(q);
     },
   });
 
-  const meQ = useQuery({
-    queryKey: ['user', 'me'],
-    queryFn: async () => {
-      const res = await api.get<SessionUser>('/api/user/me');
-      return res.data;
-    },
-  });
+  const meQ = useUser();
 
   const problems = useMemo(() => {
     const raw = problemsQ.data?.problems;
@@ -84,17 +79,15 @@ export function ProblemsPage() {
     return extractProblems(problemsQ.data);
   }, [problemsQ.data]);
 
-  const bookmarks = meQ.data?.bookmarkedProblems ?? [];
+  const bookmarks = (meQ.data as AuthUser | undefined)?.bookmarkedProblems ?? [];
   const bookmarkSet = useMemo(() => new Set(bookmarks.map((b) => b.titleSlug)), [bookmarks]);
 
   const loadOfficial = useCallback(async (titleSlug: string) => {
     setSolution(null);
     try {
-      const res = await api.get<{ solution?: { content?: string } }>(
-        `/api/problems/official-solution?titleSlug=${encodeURIComponent(titleSlug)}`
-      );
-      const c = res.data.solution?.content;
-      setSolution(c ?? JSON.stringify(res.data, null, 2).slice(0, 12000));
+      const res = await getOfficialSolution(titleSlug);
+      const c = res.solution?.content;
+      setSolution(c ?? JSON.stringify(res, null, 2).slice(0, 12000));
     } catch (e) {
       setSolution(e instanceof Error ? e.message : 'Failed');
     }
@@ -106,9 +99,9 @@ export function ProblemsPage() {
       const diff = normalizeBookmarkDifficulty(p.difficulty || 'Medium');
       try {
         if (bookmarkSet.has(p.titleSlug)) {
-          await api.delete(`/api/user/bookmarks/${encodeURIComponent(p.titleSlug)}`);
+          await removeBookmark(p.titleSlug);
         } else {
-          await api.post('/api/user/bookmarks', {
+          await addBookmark({
             titleSlug: p.titleSlug,
             title: p.title,
             difficulty: diff,
