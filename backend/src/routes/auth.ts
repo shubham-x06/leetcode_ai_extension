@@ -1,19 +1,16 @@
-import { Router } from 'express';
-import { AlfaApiError } from '../services/alfaApi';
-import { validateBody } from '../middleware/validate';
-import { googleAuthBodySchema, linkLeetcodeBodySchema } from '../validation/schemas';
-import { asyncHandler } from '../lib/asyncHandler';
+import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
+import { OAuth2Client } from 'google-auth-library';
 import { AppError } from '../errors/AppError';
 import { User, IUser } from '../models/User';
-import { verifyGoogleIdToken, verifyGoogleAccessToken } from '../services/googleAuth';
 import { signUserToken } from '../services/jwt';
-import { alfaGet } from '../services/alfaApi';
+import { getUserProfile, AlfaApiError } from '../services/alfaApi';
+import { asyncHandler } from '../lib/asyncHandler';
 
-/** Public: `POST /api/auth/google` */
 export const publicAuthRouter = Router();
-
-/** Authenticated: `POST /api/auth/link-leetcode` (mounted under protected `/api`) */
 export const protectedAuthRouter = Router();
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 function serializeAuthUser(u: Pick<IUser, 'name' | 'email' | 'avatarUrl' | 'leetcodeUsername'>) {
   return {
@@ -26,38 +23,46 @@ function serializeAuthUser(u: Pick<IUser, 'name' | 'email' | 'avatarUrl' | 'leet
 
 publicAuthRouter.post(
   '/google',
-  validateBody(googleAuthBodySchema),
   asyncHandler(async (req, res) => {
-    const body = req.body as { token?: string; accessToken?: string };
+    const schema = z.object({ token: z.string().min(1) });
+    const { token } = schema.parse(req.body);
 
-    let googleUser;
+    let ticket;
     try {
-      googleUser = body.token
-        ? await verifyGoogleIdToken(body.token)
-        : await verifyGoogleAccessToken(body.accessToken!);
+      ticket = await client.verifyIdToken({
+        idToken: token,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
     } catch {
       throw new AppError(401, 'Invalid Google token', 'AUTH_INVALID_TOKEN');
     }
 
-    let user = await User.findOne({ googleId: googleUser.sub });
+    const payload = ticket.getPayload();
+    if (!payload?.sub || !payload.email || !payload.name) {
+      throw new AppError(401, 'Invalid Google profile info', 'AUTH_INVALID_PROFILE');
+    }
+
+    let user = await User.findOne({ googleId: payload.sub });
     if (!user) {
       user = await User.create({
-        googleId: googleUser.sub,
-        email: googleUser.email,
-        name: googleUser.name,
-        avatarUrl: googleUser.picture,
+        googleId: payload.sub,
+        email: payload.email,
+        name: payload.name,
+        avatarUrl: payload.picture || '',
         leetcodeUsername: null,
       });
     } else {
-      user.email = googleUser.email;
-      user.name = googleUser.name ?? user.name;
-      user.avatarUrl = googleUser.picture ?? user.avatarUrl;
+      user.email = payload.email;
+      user.name = payload.name;
+      if (payload.picture) {
+        user.avatarUrl = payload.picture;
+      }
       await user.save();
     }
 
-    const token = signUserToken(user._id);
+    const jwtToken = signUserToken(user._id);
     res.json({
-      token,
+      token: jwtToken,
       needsLeetCodeLink: !user.leetcodeUsername,
       user: serializeAuthUser(user),
     });
@@ -66,14 +71,13 @@ publicAuthRouter.post(
 
 protectedAuthRouter.post(
   '/link-leetcode',
-  validateBody(linkLeetcodeBodySchema),
   asyncHandler(async (req, res) => {
-    const { leetcodeUsername } = req.body as { leetcodeUsername: string };
-    const username = leetcodeUsername.trim();
+    const schema = z.object({ leetcodeUsername: z.string().min(3).max(25).regex(/^[a-zA-Z0-9_]+$/) });
+    const { leetcodeUsername } = schema.parse(req.body);
 
     try {
-      await alfaGet(`/${encodeURIComponent(username)}/profile`);
-    } catch (e) {
+      await getUserProfile(leetcodeUsername);
+    } catch (e: any) {
       if (e instanceof AlfaApiError && e.status === 404) {
         throw new AppError(404, 'LeetCode username not found', 'LEETCODE_USER_NOT_FOUND');
       }
@@ -84,9 +88,10 @@ protectedAuthRouter.post(
     if (!user) {
       throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
     }
-    user.leetcodeUsername = username;
+    
+    user.leetcodeUsername = leetcodeUsername;
     await user.save();
 
-    res.json({ success: true, leetcodeUsername: username });
+    res.json({ success: true, leetcodeUsername });
   })
 );

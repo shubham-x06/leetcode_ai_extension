@@ -1,1 +1,1 @@
-export default function Component() { return null; }
+import React from 'react'; export function RatingLine({ history }: any) { return <div className='h-48 flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-lg'>Rating Line Chart</div>; }

@@ -1,34 +1,19 @@
 import NodeCache from 'node-cache';
 
-class CacheService {
-  private cache: NodeCache;
+const nodeCache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 
-  constructor() {
-    this.cache = new NodeCache({
-      stdTTL: 600, // 10 minutes default
-      checkperiod: 120,
-      useClones: false,
-    });
-  }
+export function getCache<T>(key: string): T | undefined {
+  return nodeCache.get<T>(key);
+}
 
-  get<T>(key: string): T | undefined {
-    return this.cache.get<T>(key);
-  }
-
-  set<T>(key: string, value: T, ttlSeconds?: number): boolean {
-    if (ttlSeconds !== undefined) {
-      return this.cache.set(key, value, ttlSeconds);
-    }
-    return this.cache.set(key, value);
-  }
-
-  del(key: string): number {
-    return this.cache.del(key);
-  }
-
-  flushAll(): void {
-    this.cache.flushAll();
+export function setCache<T>(key: string, value: T, ttlSeconds?: number): void {
+  if (ttlSeconds !== undefined) {
+    nodeCache.set(key, value, ttlSeconds);
+  } else {
+    nodeCache.set(key, value);
   }
 }
 
-export const cacheService = new CacheService();
+export function deleteCache(key: string): void {
+  nodeCache.del(key);
+}

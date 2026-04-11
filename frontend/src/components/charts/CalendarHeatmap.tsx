@@ -1,1 +1,1 @@
-export default function Component() { return null; }
+import React from 'react'; export function CalendarHeatmap({ data }: any) { return <div className='h-32 flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-lg'>Calendar Heatmap</div>; }

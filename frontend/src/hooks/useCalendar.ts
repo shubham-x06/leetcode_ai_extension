@@ -1,12 +1,1 @@
-import { useQuery } from '@tanstack/react-query';
-import { getCalendar } from '../api/user';
-import { useAuthStore } from '../store/useAuthStore';
-
-export function useCalendar(year?: string) {
-  const token = useAuthStore((s) => s.token);
-  return useQuery({
-    queryKey: ['user', 'calendar', year],
-    enabled: !!token,
-    queryFn: () => getCalendar(year),
-  });
-}
+import { useQuery } from '@tanstack/react-query'; import { getUserCalendar } from '../api/user'; import { useAuthStore } from '../store/useAuthStore'; export function useCalendar(year?: string) { const token = useAuthStore((s) => s.token); return useQuery({ queryKey: ['calendar', year], enabled: !!token, queryFn: () => getUserCalendar(year), staleTime: 300000 }); }

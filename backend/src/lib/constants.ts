@@ -32,4 +32,6 @@ export const ANALYZE_SYSTEM_PROMPT = `You are a senior engineer. Respond with JS
   "improvementTips": ["short tips"]
 }`;
 
-export const ALFA_API_BASE_URL = 'https://alfa-leetcode-api.onrender.com';
+export const DAILY_GOAL_SYSTEM_PROMPT = `Generate a motivational paragraph and an ordered problem list for the user's weak topics.`;
+
+export const RECOMMEND_SYSTEM_PROMPT = `Recommend the single best next problem. Include a reasoning field.`;

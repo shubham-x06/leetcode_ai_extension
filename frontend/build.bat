@@ -1,4 +1,9 @@
 @echo off
-cd /d "c:\Users\Shubham\Desktop\leetcode-extension\frontend"
-call npx tsc -b
-call npx vite build
+echo Building frontend...
+call npm run build
+echo Clearing extension/dashboard...
+rmdir /s /q "..\extension\dashboard" 2>nul
+echo Copying...
+mkdir "..\extension\dashboard" 2>nul
+xcopy /e /y "dist\*" "..\extension\dashboard\"
+echo Done.

@@ -1,1 +1,1 @@
-export default function Component() { return null; }
+import React from 'react'; export function SolvedRings({ stats }: any) { return <div className='h-48 flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-900 rounded-lg'>Solved Rings Chart</div>; }

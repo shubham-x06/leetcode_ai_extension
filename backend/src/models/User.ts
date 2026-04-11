@@ -27,8 +27,8 @@ export interface UserPreferences {
 export interface IUser extends Document {
   googleId: string;
   email: string;
-  name?: string;
-  avatarUrl?: string;
+  name: string;
+  avatarUrl: string;
   leetcodeUsername: string | null;
   cachedWeakTopics: string[];
   bookmarkedProblems: BookmarkedProblem[];
@@ -75,8 +75,8 @@ const UserSchema = new Schema<IUser>(
   {
     googleId: { type: String, required: true, unique: true, index: true },
     email: { type: String, required: true, unique: true, index: true },
-    name: { type: String },
-    avatarUrl: { type: String },
+    name: { type: String, required: true },
+    avatarUrl: { type: String, required: true },
     leetcodeUsername: { type: String, default: null, trim: true, sparse: true, index: true },
     cachedWeakTopics: { type: [String], default: [] },
     bookmarkedProblems: { type: [BookmarkedProblemSchema], default: [] },
@@ -91,6 +91,7 @@ const UserSchema = new Schema<IUser>(
 
 UserSchema.index({ leetcodeUsername: 1 }, { sparse: true });
 
+export default mongoose.model<IUser>('User', UserSchema);
 export const User = mongoose.model<IUser>('User', UserSchema);
 
 export type UserDocument = IUser & { _id: Types.ObjectId };

@@ -1,107 +1,41 @@
-import { useQuery } from '@tanstack/react-query';
-import api from './axios';
+import { apiClient } from './axios';
 
-export interface User {
-  name?: string;
-  email: string;
-  avatarUrl?: string;
-  leetcodeUsername: string | null;
-  preferences: {
-    targetDifficulty: string;
-    dailyGoalCount: number;
-    preferredLanguage: string;
-    theme: string;
-  };
-  bookmarkedProblems: Array<{
-    titleSlug: string;
-    title: string;
-    difficulty: string;
-    addedAt: string;
-  }>;
-  cachedWeakTopics: string[];
+export async function getMe() {
+  const res = await apiClient.get('/user/me');
+  return res.data;
 }
 
-export interface UserStats {
-  profile: Record<string, unknown>;
-  solved: Record<string, unknown>;
-  skills: Record<string, unknown>;
-  languages: Record<string, unknown>;
+export async function getUserStats() {
+  const res = await apiClient.get('/user/stats');
+  return res.data;
 }
 
-export interface CalendarData {
-  submissionCalendar: string;
-  streak: number;
-  longestStreak: number;
-  totalActiveDays: number;
+export async function getUserCalendar(year?: string) {
+  const res = await apiClient.get('/user/calendar' + (year ? `?year=${year}` : ''));
+  return res.data;
 }
 
-export interface ContestData {
-  contestDetails: Record<string, unknown>;
-  contestHistory: Array<Record<string, unknown>>;
+export async function getUserContest() {
+  const res = await apiClient.get('/user/contest');
+  return res.data;
 }
 
-export interface Submission {
-  title: string;
-  titleSlug: string;
-  timestamp: string;
-  statusDisplay: string;
-  lang: string;
+export async function getSubmissions(limit: number = 10) {
+  const res = await apiClient.get(`/user/submissions?limit=${limit}`);
+  return res.data;
 }
 
-export const userApi = {
-  getMe: async (): Promise<User> => {
-    const response = await api.get('/user/me');
-    return response.data;
-  },
-  getStats: async (): Promise<UserStats> => {
-    const response = await api.get('/user/stats');
-    return response.data;
-  },
-  getCalendar: async (year?: string): Promise<CalendarData> => {
-    const response = await api.get('/user/calendar', { params: year ? { year } : {} });
-    return response.data;
-  },
-  getContest: async (): Promise<ContestData> => {
-    const response = await api.get('/user/contest');
-    return response.data;
-  },
-  getSubmissions: async (limit?: number): Promise<Submission[]> => {
-    const response = await api.get('/user/submissions', { params: limit ? { limit } : {} });
-    return response.data;
-  },
-};
+export async function updatePreferences(changes: any) {
+  const res = await apiClient.patch('/user/preferences', changes);
+  return res.data;
+}
 
-export const useUser = () => {
-  return useQuery({
-    queryKey: ['user'],
-    queryFn: userApi.getMe,
-  });
-};
+export async function addBookmark(problem: { titleSlug: string; title: string; difficulty: string }) {
+  const res = await apiClient.post('/user/bookmarks', problem);
+  return res.data;
+}
 
-export const useUserStats = () => {
-  return useQuery({
-    queryKey: ['userStats'],
-    queryFn: userApi.getStats,
-  });
-};
-
-export const useCalendar = (year?: string) => {
-  return useQuery({
-    queryKey: ['calendar', year],
-    queryFn: () => userApi.getCalendar(year),
-  });
-};
-
-export const useContest = () => {
-  return useQuery({
-    queryKey: ['contest'],
-    queryFn: userApi.getContest,
-  });
-};
-
-export const useSubmissions = (limit?: number) => {
-  return useQuery({
-    queryKey: ['submissions', limit],
-    queryFn: () => userApi.getSubmissions(limit),
-  });
-};
+export async function removeBookmark(titleSlug: string) {
+  const res = await apiClient.delete(`/user/bookmarks/${encodeURIComponent(titleSlug)}`);
+  return res.data;
+}

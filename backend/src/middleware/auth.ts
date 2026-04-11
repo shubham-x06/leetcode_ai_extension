@@ -1,24 +1,21 @@
-import type { Request, Response, NextFunction } from 'express';
-import mongoose from 'mongoose';
-import { verifyUserToken } from '../services/jwt';
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
   const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+  
   if (!token) {
-    res.status(401).json({ error: 'Unauthorized', code: 'NO_TOKEN' });
+    res.status(401).json({ error: 'No token provided', code: 'AUTH_NO_TOKEN' });
     return;
   }
+  
   try {
-    const { userId } = verifyUserToken(token);
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      res.status(401).json({ error: 'Invalid token', code: 'INVALID_TOKEN' });
-      return;
-    }
-    req.userId = new mongoose.Types.ObjectId(userId);
+    const payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+    req.userId = (payload as { userId: string }).userId;
     next();
-  } catch {
-    res.status(401).json({ error: 'Token expired or invalid', code: 'JWT_INVALID' });
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid or expired token', code: 'AUTH_INVALID_TOKEN' });
   }
 }
 
@@ -30,10 +27,8 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction): v
     return;
   }
   try {
-    const { userId } = verifyUserToken(token);
-    if (mongoose.Types.ObjectId.isValid(userId)) {
-      req.userId = new mongoose.Types.ObjectId(userId);
-    }
+    const payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+    req.userId = (payload as { userId: string }).userId;
   } catch {
     /* ignore */
   }

@@ -1,20 +1,24 @@
 import { Router } from 'express';
-import type { Types } from 'mongoose';
+import { z } from 'zod';
 import { AppError } from '../errors/AppError';
 import { asyncHandler } from '../lib/asyncHandler';
-import { validateBody } from '../middleware/validate';
-import {
-  bookmarkCreateSchema,
-  preferencesPatchSchema,
-} from '../validation/schemas';
 import { User, normalizeBookmarkDifficulty } from '../models/User';
-import { alfaGet } from '../services/alfaApi';
-import { parseSubmissionCalendarMap, streaksFromCalendarMap } from '../lib/computeStreaks';
-import { extractWeakestTopicsByProblemsSolved } from '../lib/computeWeakTopics';
+import {
+  getUserProfile,
+  getUserSolved,
+  getUserSkills,
+  getUserLanguages,
+  getUserCalendar,
+  getUserContest,
+  getUserContestHistory,
+  getUserSubmissions
+} from '../services/alfaApi';
+import { computeStreaks } from '../lib/computeStreaks';
+import { computeWeakTopics } from '../lib/computeWeakTopics';
 
 export const userRouter = Router();
 
-async function requireLeetcodeUsername(userId: Types.ObjectId): Promise<string> {
+async function requireLeetcodeUsername(userId: string): Promise<string> {
   const u = await User.findById(userId).lean();
   const n = u?.leetcodeUsername?.trim();
   if (!n) {
@@ -23,51 +27,38 @@ async function requireLeetcodeUsername(userId: Types.ObjectId): Promise<string> 
   return n;
 }
 
-function serializeMe(user: import('mongoose').HydratedDocument<import('../models/User').IUser>) {
-  return {
-    name: user.name,
-    email: user.email,
-    avatarUrl: user.avatarUrl,
-    leetcodeUsername: user.leetcodeUsername,
-    preferences: user.preferences,
-    bookmarkedProblems: user.bookmarkedProblems,
-    cachedWeakTopics: user.cachedWeakTopics,
-  };
-}
-
 userRouter.get(
   '/me',
   asyncHandler(async (req, res) => {
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.userId).select('-__v -googleId -_id');
     if (!user) {
       throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
     }
-    res.json(serializeMe(user));
+    res.json(user);
   })
 );
 
 userRouter.get(
   '/stats',
   asyncHandler(async (req, res) => {
-    const username = await requireLeetcodeUsername(req.userId!);
-    const u = encodeURIComponent(username);
+    const username = await requireLeetcodeUsername(req.userId);
     const [profile, solved, skill, language] = await Promise.all([
-      alfaGet(`/${u}/profile`),
-      alfaGet(`/${u}/solved`),
-      alfaGet(`/${u}/skill`),
-      alfaGet(`/${u}/language`),
+      getUserProfile(username),
+      getUserSolved(username),
+      getUserSkills(username),
+      getUserLanguages(username),
     ]);
 
     res.json({
-      profile: profile.data,
-      solved: solved.data,
-      skills: skill.data,
-      languages: language.data,
+      profile,
+      solved,
+      skills: skill,
+      languages: language,
     });
 
-    const weak = extractWeakestTopicsByProblemsSolved(skill.data, 3);
+    const weak = computeWeakTopics(skill);
     if (weak.length) {
-      void User.findByIdAndUpdate(req.userId, { cachedWeakTopics: weak }).catch(() => {});
+      User.findByIdAndUpdate(req.userId, { cachedWeakTopics: weak }).catch(() => {});
     }
   })
 );
@@ -75,32 +66,22 @@ userRouter.get(
 userRouter.get(
   '/calendar',
   asyncHandler(async (req, res) => {
-    const username = await requireLeetcodeUsername(req.userId!);
-    const year =
-      typeof req.query.year === 'string' && req.query.year
-        ? req.query.year
-        : String(new Date().getUTCFullYear());
-    const u = encodeURIComponent(username);
-    const { data } = await alfaGet(`/${u}/calendar?year=${encodeURIComponent(year)}`);
+    const username = await requireLeetcodeUsername(req.userId);
+    const year = typeof req.query.year === 'string' && req.query.year ? req.query.year : '';
+    const data = await getUserCalendar(username, year);
 
-    let submissionCalendar = '';
-    const root = data as Record<string, unknown>;
-    const rawCal =
-      typeof root?.submissionCalendar === 'string'
-        ? root.submissionCalendar
-        : typeof data === 'string'
-          ? data
-          : JSON.stringify(data ?? {});
-    submissionCalendar = typeof rawCal === 'string' ? rawCal : JSON.stringify(rawCal);
+    let submissionCalendarJson = '';
+    if (data.submissionCalendar) {
+      submissionCalendarJson = typeof data.submissionCalendar === 'string' ? data.submissionCalendar : JSON.stringify(data.submissionCalendar);
+    } else {
+      submissionCalendarJson = JSON.stringify(data);
+    }
 
-    const map = parseSubmissionCalendarMap(data);
-    const { current, longest, totalActiveDays } = streaksFromCalendarMap(map);
+    const streakData = computeStreaks(submissionCalendarJson);
 
     res.json({
-      submissionCalendar,
-      streak: current,
-      longestStreak: longest,
-      totalActiveDays,
+      submissionCalendar: submissionCalendarJson,
+      ...streakData
     });
   })
 );
@@ -108,36 +89,24 @@ userRouter.get(
 userRouter.get(
   '/contest',
   asyncHandler(async (req, res) => {
-    const username = await requireLeetcodeUsername(req.userId!);
-    const u = encodeURIComponent(username);
-    const [contest, history] = await Promise.all([
-      alfaGet(`/${u}/contest`),
-      alfaGet(`/${u}/contest/history`),
+    const username = await requireLeetcodeUsername(req.userId);
+    const [contestDetails, history] = await Promise.all([
+      getUserContest(username),
+      getUserContestHistory(username),
     ]);
 
-    const unwrap = (payload: unknown): unknown => {
-      if (payload && typeof payload === 'object' && 'data' in (payload as object)) {
-        return (payload as { data: unknown }).data;
-      }
-      return payload;
-    };
-
-    let contestDetails = unwrap(contest.data) as Record<string, unknown>;
-    if (contestDetails && typeof contestDetails === 'object' && 'data' in contestDetails) {
-      contestDetails = contestDetails.data as Record<string, unknown>;
-    }
-
-    let contestHistory = unwrap(history.data);
-    if (!Array.isArray(contestHistory) && contestHistory && typeof contestHistory === 'object') {
-      const h = contestHistory as Record<string, unknown>;
-      contestHistory = (h.contestHistory as unknown[]) || (h.data as unknown[]) || [];
+    let contestHistory = history;
+    if (history.contestHistory) {
+      contestHistory = history.contestHistory;
+    } else if (history.data) {
+      contestHistory = history.data;
     }
     if (!Array.isArray(contestHistory)) {
       contestHistory = [];
     }
 
     res.json({
-      contestDetails: contestDetails ?? {},
+      contestDetails: contestDetails || {},
       contestHistory,
     });
   })
@@ -146,15 +115,13 @@ userRouter.get(
 userRouter.get(
   '/submissions',
   asyncHandler(async (req, res) => {
-    const username = await requireLeetcodeUsername(req.userId!);
-    const rawLimit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 10;
-    const limit = Number.isFinite(rawLimit) ? Math.min(20, Math.max(1, Math.floor(rawLimit))) : 10;
-    const u = encodeURIComponent(username);
-    const { data } = await alfaGet(`/${u}/acSubmission?limit=${limit}`, { ttlSeconds: 300 });
+    const username = await requireLeetcodeUsername(req.userId);
+    const limit = Math.min(20, Math.max(1, Number(req.query.limit) || 10));
+    const data = await getUserSubmissions(username, limit);
 
     const rows: unknown[] = [];
     const visit = (node: unknown, depth = 0): void => {
-      if (depth > 22 || node == null) return;
+      if (depth > 20 || node == null) return;
       if (Array.isArray(node)) {
         node.forEach((x) => visit(x, depth + 1));
         return;
@@ -174,58 +141,51 @@ userRouter.get(
     };
     visit(data);
 
-    const submissions = rows.slice(0, limit) as Array<{
-      title: string;
-      titleSlug: string;
-      timestamp: string;
-      statusDisplay: string;
-      lang: string;
-    }>;
-
-    res.json({ submissions });
+    res.json({ submissions: rows.slice(0, limit) });
   })
 );
 
 userRouter.patch(
   '/preferences',
-  validateBody(preferencesPatchSchema),
   asyncHandler(async (req, res) => {
+    const schema = z.object({
+      targetDifficulty: z.enum(['Easy', 'Medium', 'Hard', 'Mixed']).optional(),
+      dailyGoalCount: z.number().min(1).max(5).optional(),
+      preferredLanguage: z.string().optional(),
+      theme: z.enum(['light', 'dark']).optional(),
+    });
+    const parsed = schema.parse(req.body);
+
     const user = await User.findById(req.userId);
-    if (!user) {
-      throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
-    }
-    const b = req.body as Partial<{
-      targetDifficulty: string;
-      dailyGoalCount: number;
-      preferredLanguage: string;
-      theme: string;
-    }>;
-    if (b.targetDifficulty) user.preferences.targetDifficulty = b.targetDifficulty as never;
-    if (typeof b.dailyGoalCount === 'number') user.preferences.dailyGoalCount = b.dailyGoalCount;
-    if (typeof b.preferredLanguage === 'string') user.preferences.preferredLanguage = b.preferredLanguage;
-    if (b.theme) user.preferences.theme = b.theme as never;
+    if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
+
+    user.preferences = {
+      ...user.preferences,
+      ...parsed
+    };
     await user.save();
+    
     res.json({ success: true, preferences: user.preferences });
   })
 );
 
 userRouter.post(
   '/bookmarks',
-  validateBody(bookmarkCreateSchema),
   asyncHandler(async (req, res) => {
-    const { titleSlug, title, difficulty } = req.body as {
-      titleSlug: string;
-      title: string;
-      difficulty: string;
-    };
+    const schema = z.object({
+      titleSlug: z.string().min(1),
+      title: z.string().min(1),
+      difficulty: z.string().min(1)
+    });
+    const { titleSlug, title, difficulty } = schema.parse(req.body);
+
     const user = await User.findById(req.userId);
-    if (!user) {
-      throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
-    }
-    const exists = user.bookmarkedProblems.some((b) => b.titleSlug === titleSlug);
-    if (exists) {
+    if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
+
+    if (user.bookmarkedProblems.some((b) => b.titleSlug === titleSlug)) {
       throw new AppError(409, 'Already bookmarked', 'ALREADY_BOOKMARKED');
     }
+
     user.bookmarkedProblems.push({
       titleSlug,
       title,
@@ -242,9 +202,8 @@ userRouter.delete(
   asyncHandler(async (req, res) => {
     const slug = req.params.titleSlug;
     const user = await User.findById(req.userId);
-    if (!user) {
-      throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
-    }
+    if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
+
     user.bookmarkedProblems = user.bookmarkedProblems.filter((b) => b.titleSlug !== slug);
     await user.save();
     res.json({ success: true });

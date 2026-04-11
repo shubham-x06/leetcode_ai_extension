@@ -1,4 +1,1 @@
-// Popup script to open dashboard
-document.getElementById('openDashboard').addEventListener('click', () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/index.html') });
-});
+chrome.tabs.create({ url: "dashboard/index.html" }); window.close();

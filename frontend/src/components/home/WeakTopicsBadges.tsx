@@ -1,1 +1,1 @@
-export default function Component() { return null; }
+import React from 'react'; export function WeakTopicsBadges({ topics }: any) { return <div className='flex gap-2 p-2'>{topics?.map((t: string) => <span key={t} className='px-2 py-1 bg-red-100 text-red-800 rounded'>{t}</span>)}</div>; }

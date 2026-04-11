@@ -1,18 +1,29 @@
-// Content script to inject widget on LeetCode problem pages
-function injectWidget() {
-  if (document.querySelector('.leetcode-ai-widget')) return;
+(function() {
+  if (document.getElementById('leetcode-ai-extension-widget')) return;
 
-  const widget = document.createElement('div');
-  widget.className = 'leetcode-ai-widget';
-  widget.innerHTML = `
-    <iframe src="${chrome.runtime.getURL('widget.html')}" style="border: none; width: 300px; height: 400px;"></iframe>
-  `;
-  widget.style.position = 'fixed';
-  widget.style.top = '100px';
-  widget.style.right = '20px';
-  widget.style.zIndex = '10000';
+  const container = document.createElement('div');
+  container.id = 'leetcode-ai-extension-widget';
+  Object.assign(container.style, {
+    position: 'fixed',
+    bottom: '20px',
+    right: '20px',
+    width: '350px',
+    height: '500px',
+    border: 'none',
+    zIndex: '999999',
+    borderRadius: '12px',
+    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+    overflow: 'hidden'
+  });
 
-  document.body.appendChild(widget);
-}
+  const iframe = document.createElement('iframe');
+  iframe.src = chrome.runtime.getURL('widget.html');
+  Object.assign(iframe.style, {
+    width: '100%',
+    height: '100%',
+    border: 'none',
+  });
 
-injectWidget();
+  container.appendChild(iframe);
+  document.body.appendChild(container);
+})();

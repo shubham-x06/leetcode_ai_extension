@@ -5,47 +5,35 @@ interface User {
   email: string;
   avatarUrl?: string;
   leetcodeUsername: string | null;
+  [key: string]: any;
 }
 
 interface AuthState {
   token: string | null;
   user: User | null;
-  isLoading: boolean;
-  setToken: (token: string | null) => void;
-  setUser: (user: User | null) => void;
-  setLoading: (loading: boolean) => void;
+  login: (token: string, user: User) => void;
   logout: () => void;
+  updateUser: (changes: Partial<User>) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   token: null,
   user: null,
-  isLoading: false,
-  setToken: async (token) => {
-    if (token) {
-      localStorage.setItem('authToken', token);
-      if ((window as any).chrome && (window as any).chrome.storage) {
-        await new Promise<void>((resolve) => {
-          (window as any).chrome.storage.local.set({ authToken: token }, resolve);
-        });
-      }
-    } else {
-      localStorage.removeItem('authToken');
-      if ((window as any).chrome && (window as any).chrome.storage) {
-        await new Promise<void>((resolve) => {
-          (window as any).chrome.storage.local.remove('authToken', resolve);
-        });
-      }
+  login: (token, user) => {
+    localStorage.setItem('authToken', token);
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.set({ authToken: token });
     }
-    set({ token });
+    set({ token, user });
   },
-  setUser: (user) => set({ user }),
-  setLoading: (loading) => set({ isLoading: loading }),
   logout: () => {
     localStorage.removeItem('authToken');
-    if ((window as any).chrome && (window as any).chrome.storage) {
-      (window as any).chrome.storage.local.remove('authToken');
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.remove('authToken');
     }
     set({ token: null, user: null });
   },
+  updateUser: (changes) => set((state) => ({ user: state.user ? { ...state.user, ...changes } : null }))
 }));
+
+export default useAuthStore;

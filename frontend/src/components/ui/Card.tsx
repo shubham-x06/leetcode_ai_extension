@@ -1,12 +1,30 @@
+import React from 'react';
+
 interface CardProps {
   children: React.ReactNode;
   className?: string;
 }
 
-export default function Card({ children, className = '' }: CardProps) {
+export function Card({ children, className = '' }: CardProps) {
   return (
-    <div className={`bg-white shadow rounded-lg p-6 ${className}`}>
+    <div className={`rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950 ${className}`}>
       {children}
     </div>
   );
+}
+
+export function CardHeader({ children, className = '' }: CardProps) {
+  return <div className={`flex flex-col space-y-1.5 p-6 ${className}`}>{children}</div>;
+}
+
+export function CardTitle({ children, className = '' }: CardProps) {
+  return <h3 className={`text-xl font-semibold leading-none tracking-tight ${className}`}>{children}</h3>;
+}
+
+export function CardContent({ children, className = '' }: CardProps) {
+  return <div className={`p-6 pt-0 ${className}`}>{children}</div>;
+}
+
+export function CardFooter({ children, className = '' }: CardProps) {
+  return <div className={`flex items-center p-6 pt-0 ${className}`}>{children}</div>;
 }

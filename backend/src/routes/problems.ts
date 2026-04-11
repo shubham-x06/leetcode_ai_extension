@@ -1,19 +1,10 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { AppError } from '../errors/AppError';
 import { asyncHandler } from '../lib/asyncHandler';
-import { alfaGet, secondsUntilNextUtcMidnight } from '../services/alfaApi';
-import { extractProblemsArray, extractTotalCount } from '../services/alfaProblems';
+import { getDailyProblem, getProblemList, getProblem, getOfficialSolution, AlfaApiError } from '../services/alfaApi';
 
 export const problemsRouter = Router();
-
-function rethrowAlfa(e: unknown): never {
-  const msg = e instanceof Error ? e.message : 'Upstream LeetCode proxy failed';
-  const code = (e as Error & { code?: string }).code;
-  if (code === 'PRIVATE_PROFILE') {
-    throw new AppError(403, msg, code);
-  }
-  throw new AppError(502, msg, 'ALFA_ERROR');
-}
 
 function unwrapDailyProblem(data: unknown): unknown {
   if (!data || typeof data !== 'object') return data;
@@ -32,11 +23,10 @@ problemsRouter.get(
   '/daily',
   asyncHandler(async (_req, res) => {
     try {
-      const ttl = secondsUntilNextUtcMidnight();
-      const { data } = await alfaGet('/daily', { ttlSeconds: ttl });
+      const data = await getDailyProblem();
       res.json({ problem: unwrapDailyProblem(data) });
-    } catch (e) {
-      rethrowAlfa(e);
+    } catch (e: any) {
+      throw new AppError(502, e.message || 'Upstream LeetCode proxy failed', 'ALFA_ERROR');
     }
   })
 );
@@ -45,29 +35,31 @@ problemsRouter.get(
   '/list',
   asyncHandler(async (req, res) => {
     try {
-      const q = new URLSearchParams();
-      const tags = req.query.tags;
-      const difficulty = req.query.difficulty;
-      const search = req.query.search;
-      const rawLimit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 20;
-      const rawSkip = typeof req.query.skip === 'string' ? Number(req.query.skip) : 0;
-      const limit = Number.isFinite(rawLimit) ? Math.min(50, Math.max(1, Math.floor(rawLimit))) : 20;
-      const skip = Number.isFinite(rawSkip) ? Math.max(0, Math.floor(rawSkip)) : 0;
-      if (typeof tags === 'string' && tags) q.set('tags', tags.replace(/\s+/g, '+').replace(/,/g, '+'));
-      if (typeof difficulty === 'string' && difficulty) {
-        const d = difficulty.toUpperCase();
-        q.set('difficulty', d === 'EASY' || d === 'MEDIUM' || d === 'HARD' ? d : difficulty);
+      const rawLimit = Number(req.query.limit) || 20;
+      const limit = Math.min(50, Math.max(1, rawLimit));
+      const skip = Math.max(0, Number(req.query.skip) || 0);
+
+      let tags = req.query.tags as string | undefined;
+      if (tags) {
+        tags = tags.replace(/\s+/g, '+').replace(/,/g, '+');
       }
-      if (typeof search === 'string' && search.trim()) q.set('search', search.trim());
-      q.set('limit', String(limit));
-      q.set('skip', String(skip));
-      const path = `/problems?${q.toString()}`;
-      const { data } = await alfaGet(path);
-      const arr = extractProblemsArray(data);
-      const total = extractTotalCount(data, arr.length);
+
+      let difficulty = req.query.difficulty as string | undefined;
+      if (difficulty) {
+        const d = difficulty.toUpperCase();
+        if (d === 'EASY' || d === 'MEDIUM' || d === 'HARD') difficulty = d;
+      }
+      
+      const search = req.query.search as string | undefined;
+
+      const data = await getProblemList({ limit, skip, tags, difficulty, search: search?.trim() });
+      
+      const arr = data.problemsetQuestionList || data.data?.problemsetQuestionList || data.problems || [];
+      const total = data.totalQuestions || data.data?.totalQuestions || data.total || arr.length;
+      
       res.json({ problems: arr, total });
-    } catch (e) {
-      rethrowAlfa(e);
+    } catch (e: any) {
+      throw new AppError(502, e.message || 'Upstream LeetCode proxy failed', 'ALFA_ERROR');
     }
   })
 );
@@ -75,15 +67,14 @@ problemsRouter.get(
 problemsRouter.get(
   '/select',
   asyncHandler(async (req, res) => {
-    const titleSlug = typeof req.query.titleSlug === 'string' ? req.query.titleSlug.trim() : '';
-    if (!titleSlug) {
-      throw new AppError(400, 'titleSlug required', 'VALIDATION');
-    }
+    const schema = z.object({ titleSlug: z.string().min(1) });
+    const { titleSlug } = schema.parse(req.query);
+    
     try {
-      const { data } = await alfaGet(`/select?titleSlug=${encodeURIComponent(titleSlug)}`);
+      const data = await getProblem(titleSlug);
       res.json(data);
-    } catch (e) {
-      rethrowAlfa(e);
+    } catch (e: any) {
+      throw new AppError(502, e.message || 'Upstream LeetCode proxy failed', 'ALFA_ERROR');
     }
   })
 );
@@ -108,24 +99,22 @@ function extractSolutionContent(data: unknown): string | null {
 problemsRouter.get(
   '/official-solution',
   asyncHandler(async (req, res) => {
-    const titleSlug = typeof req.query.titleSlug === 'string' ? req.query.titleSlug.trim() : '';
-    if (!titleSlug) {
-      throw new AppError(400, 'titleSlug required', 'VALIDATION');
-    }
+    const schema = z.object({ titleSlug: z.string().min(1) });
+    const { titleSlug } = schema.parse(req.query);
+    
     try {
-      const { data } = await alfaGet(`/officialSolution?titleSlug=${encodeURIComponent(titleSlug)}`);
+      const data = await getOfficialSolution(titleSlug);
       const content = extractSolutionContent(data);
       if (content == null || content === '') {
         throw new AppError(404, 'No official solution available', 'NO_OFFICIAL_SOLUTION');
       }
       res.json({ solution: { content } });
-    } catch (e) {
+    } catch (e: any) {
       if (e instanceof AppError) throw e;
-      const msg = e instanceof Error ? e.message : '';
-      if (msg.includes('404') || msg.includes('HTTP 404')) {
+      if (e instanceof AlfaApiError && e.status === 404) {
         throw new AppError(404, 'No official solution available', 'NO_OFFICIAL_SOLUTION');
       }
-      rethrowAlfa(e);
+      throw new AppError(502, e.message || '', 'ALFA_ERROR');
     }
   })
 );
