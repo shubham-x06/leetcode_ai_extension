@@ -1,21 +1,27 @@
 import React from 'react';
 
 interface EmptyStateProps {
-  icon?: React.ReactNode;
-  title: string;
+  title?: string;
   description?: string;
   action?: React.ReactNode;
 }
 
-export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
+export function EmptyState({ title = 'Nothing here yet', description = 'Data will appear once available.', action }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center p-10 text-center rounded-xl border border-gray-200 bg-gray-50 dark:bg-gray-900 dark:border-gray-800">
-      {icon && <div className="text-4xl mb-4 text-gray-400 dark:text-gray-600">{icon}</div>}
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-      {description && (
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-sm">{description}</p>
-      )}
-      {action && <div className="mt-4">{action}</div>}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-12)', gap: 'var(--space-4)', textAlign: 'center' }}>
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+        <circle cx="32" cy="32" r="20" stroke="var(--border-default)" strokeWidth="1.5" />
+        <circle cx="22" cy="28" r="3" fill="var(--border-default)" />
+        <circle cx="32" cy="24" r="2" fill="var(--border-strong)" />
+        <circle cx="42" cy="30" r="4" fill="var(--border-default)" />
+        <circle cx="28" cy="38" r="2.5" fill="var(--border-default)" />
+        <circle cx="38" cy="38" r="2" fill="var(--border-strong)" />
+      </svg>
+      <div>
+        <p className="h3" style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-2)' }}>{title}</p>
+        <p className="caption" style={{ maxWidth: 280, margin: '0 auto' }}>{description}</p>
+      </div>
+      {action && <div style={{ marginTop: 'var(--space-2)' }}>{action}</div>}
     </div>
   );
 }

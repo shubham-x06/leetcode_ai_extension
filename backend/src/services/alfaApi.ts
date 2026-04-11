@@ -2,7 +2,6 @@ import axios, { type AxiosError } from 'axios';
 import { getCache, setCache } from './cache';
 
 const ALFA_API_BASE_URL = 'https://alfa-leetcode-api.onrender.com';
-
 export class AlfaApiError extends Error {
   constructor(public status: number, message: string, public code: string) {
     super(message);
@@ -25,28 +24,39 @@ export function secondsUntilNextUtcMidnight(): number {
   return Math.max(1, Math.floor((next.getTime() - now.getTime()) / 1000));
 }
 
+async function fetchAlfaOnce<T>(url: string): Promise<T> {
+  const res = await axios.get<T>(url, { timeout: 45000, validateStatus: () => true });
+  if (res.status >= 400) {
+    throw new AlfaApiError(res.status, `Alfa HTTP ${res.status}`, 'ALFA_HTTP_ERROR');
+  }
+  const data = res.data;
+  const bodyStatus = (data as { statusCode?: number })?.statusCode;
+  if (typeof bodyStatus === 'number' && bodyStatus >= 400) {
+    throw new AlfaApiError(bodyStatus, `Alfa error status ${bodyStatus}`, 'ALFA_BODY_ERROR');
+  }
+  return data;
+}
+
 async function fetchAlfa<T>(path: string, ttlSeconds = 600): Promise<T> {
   const key = `alfa:${path}`;
   const hit = getCache<T>(key);
   if (hit !== undefined) return hit;
 
+  const url = `${ALFA_API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+
   try {
-    const url = `${ALFA_API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
-    const res = await axios.get<T>(url, { timeout: 25000, validateStatus: () => true });
-    
-    if (res.status >= 400) {
-      throw new AlfaApiError(res.status, `Alfa HTTP ${res.status}`, 'ALFA_HTTP_ERROR');
+    let data: T;
+    try {
+      data = await fetchAlfaOnce<T>(url);
+    } catch (firstErr) {
+      // Retry once — Render free tier cold-starts can take 30-50s
+      console.warn(`[alfa] Attempt 1 failed for ${path}:`, (firstErr as Error).message);
+      data = await fetchAlfaOnce<T>(url);
     }
-    
-    const data = res.data;
-    const bodyStatus = (data as { statusCode?: number })?.statusCode;
-    if (typeof bodyStatus === 'number' && bodyStatus >= 400) {
-      throw new AlfaApiError(bodyStatus, `Alfa error status ${bodyStatus}`, 'ALFA_BODY_ERROR');
-    }
-    
     setCache(key, data, ttlSeconds);
     return data;
   } catch (err) {
+    console.error(`[alfa] Permanent failure for ${path}:`, (err as Error).message);
     if (err instanceof AlfaApiError) throw err;
     if (isPrivateProfileError(err)) {
       const e = new Error('LeetCode profile appears private or unavailable. Make your profile public to sync stats.');

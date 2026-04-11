@@ -1,0 +1,194 @@
+/* ============================================================
+   LEET AI — DESIGN SYSTEM
+   All CSS custom properties. Every component MUST use these.
+   ============================================================ */
+
+/* ---- Reset ---- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ---- Variables ---- */
+:root {
+  /* Backgrounds */
+  --bg-primary:   #0D0D1A;
+  --bg-secondary: #111827;
+  --bg-tertiary:  #1A1A2E;
+  --bg-surface:   #1F2937;
+  --bg-elevated:  #252D3D;
+
+  /* Text */
+  --text-primary:   #F1F1EE;
+  --text-secondary: #9CA3AF;
+  --text-muted:     #6B7280;
+  --text-inverse:   #0D0D1A;
+
+  /* Accent */
+  --accent:        #6366F1;
+  --accent-hover:  #4F46E5;
+  --accent-glow:   rgba(99, 102, 241, 0.35);
+  --accent-subtle: rgba(99, 102, 241, 0.12);
+
+  /* Difficulty */
+  --easy:          #00B8A3;
+  --easy-subtle:   rgba(0, 184, 163, 0.12);
+  --medium:        #FFA116;
+  --medium-subtle: rgba(255, 161, 22, 0.12);
+  --hard:          #FF375F;
+  --hard-subtle:   rgba(255, 55, 95, 0.12);
+
+  /* Borders */
+  --border-subtle:  rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.10);
+  --border-strong:  rgba(255, 255, 255, 0.18);
+  --border-accent:  rgba(99, 102, 241, 0.40);
+
+  /* Semantic */
+  --success:        #10B981;
+  --success-subtle: rgba(16, 185, 129, 0.12);
+  --warning:        #F59E0B;
+  --warning-subtle: rgba(245, 158, 11, 0.12);
+  --error:          #EF4444;
+  --error-subtle:   rgba(239, 68, 68, 0.12);
+
+  /* Shadows */
+  --shadow-sm:     0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md:     0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg:     0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-accent: 0 0 30px rgba(99, 102, 241, 0.3);
+
+  /* Spacing */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* Radius */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-xl:   20px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.4s  cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Fonts */
+  --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, Consolas, monospace;
+}
+
+/* ---- Base ---- */
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100svh;
+  text-align: left;
+  border: none;
+  display: flex;
+  flex-direction: column;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: var(--font-sans); }
+input, select, textarea { font-family: var(--font-sans); }
+
+/* ---- Type Scale ---- */
+.display { font-family: var(--font-display); font-size: clamp(38px, 5vw, 60px); font-weight: 700; letter-spacing: -0.04em; line-height: 1.05; }
+.h1      { font-family: var(--font-display); font-size: clamp(26px, 3.5vw, 38px); font-weight: 600; letter-spacing: -0.03em; }
+.h2      { font-family: var(--font-display); font-size: clamp(20px, 2.5vw, 26px); font-weight: 600; letter-spacing: -0.02em; }
+.h3      { font-family: var(--font-display); font-size: 18px; font-weight: 600; }
+.body-lg { font-size: 16px; line-height: 1.7; }
+.body    { font-size: 15px; line-height: 1.6; }
+.caption { font-size: 13px; color: var(--text-muted); }
+.label   { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+
+/* ---- Gradient Text ---- */
+.gradient-text {
+  background: linear-gradient(135deg, #6366F1 0%, #A78BFA 50%, #38BDF8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.gradient-text-warm {
+  background: linear-gradient(135deg, #F59E0B 0%, #EF4444 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ---- Fade-Up Animation ---- */
+.fade-up {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.fade-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ---- Page Transition ---- */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: pageEnter 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ---- Shimmer / Skeleton ---- */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ---- Spin ---- */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: var(--radius-full); }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+/* ---- Focus Visible ---- */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}

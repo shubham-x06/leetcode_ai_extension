@@ -1,5 +1,6 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
+import { Card } from '../ui/Card';
+import { Badge } from '../ui/Badge';
 
 interface Analysis {
   timeComplexity?: string;
@@ -12,63 +13,85 @@ interface Analysis {
 export function AnalysisPanel({ analysis, isLoading }: { analysis?: Analysis; isLoading?: boolean }) {
   if (isLoading) {
     return (
-      <Card>
-        <CardContent>
-          <div className="h-24 flex items-center justify-center text-gray-400">Analyzing code...</div>
-        </CardContent>
-      </Card>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-4)', animation: 'pageEnter 0.4s ease-out' }}>
+        {[...Array(4)].map((_, i) => (
+          <div key={i} style={{ height: 100, background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)' }} className="shimmer-base" />
+        ))}
+      </div>
     );
   }
 
   if (!analysis) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Code Analysis 🔍</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Time</p>
-            <p className="font-mono font-semibold text-gray-900 dark:text-gray-100">{analysis.timeComplexity}</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', animation: 'pageEnter 0.4s ease-out' }}>
+      {/* 2x2 Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-4)' }}>
+        <ResultCard 
+          label="Time Complexity" 
+          value={analysis.timeComplexity || 'O(N)'} 
+          accent 
+        />
+        <ResultCard 
+          label="Space Complexity" 
+          value={analysis.spaceComplexity || 'O(1)'} 
+          accent 
+        />
+        <ResultCard 
+          label="Topic Reinforced" 
+          content={<Badge variant="accent" style={{ marginTop: '4px' }}>{analysis.topicReinforced || 'Recursion'}</Badge>} 
+        />
+        <ResultCard 
+          label="Optimization Tip" 
+          content={
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.4, marginTop: '4px' }}>
+              {analysis.improvementTips?.[0] || 'Consider iterative approach to avoid stack overflow.'}
+            </div>
+          } 
+        />
+      </div>
+
+      {/* Alternative Approaches */}
+      {analysis.alternativeApproaches && analysis.alternativeApproaches.length > 0 && (
+        <Card>
+          <p className="label" style={{ marginBottom: 'var(--space-4)' }}>Alternative Approaches</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            {analysis.alternativeApproaches.map((alt, i) => (
+              <div 
+                key={i} 
+                style={{ 
+                  display: 'flex', 
+                  gap: 'var(--space-4)', 
+                  paddingBottom: i === analysis.alternativeApproaches!.length - 1 ? 0 : 'var(--space-4)',
+                  borderBottom: i === analysis.alternativeApproaches!.length - 1 ? 'none' : '1px solid var(--border-subtle)'
+                }}
+              >
+                <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{i + 1}.</span>
+                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{alt}</p>
+              </div>
+            ))}
           </div>
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Space</p>
-            <p className="font-mono font-semibold text-gray-900 dark:text-gray-100">{analysis.spaceComplexity}</p>
-          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function ResultCard({ label, value, content, accent = false }: { label: string; value?: string; content?: React.ReactNode; accent?: boolean }) {
+  return (
+    <div style={{
+      background: 'var(--bg-secondary)',
+      border: '1px solid var(--border-subtle)',
+      borderRadius: 'var(--radius-lg)',
+      padding: 'var(--space-5)',
+      borderLeft: accent ? '3px solid var(--accent)' : 'none'
+    }}>
+      <p className="label" style={{ fontSize: '10px', marginBottom: '4px' }}>{label}</p>
+      {value ? (
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>
+          {value}
         </div>
-        {analysis.topicReinforced && (
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Topic Reinforced</p>
-            <p className="text-sm text-gray-900 dark:text-gray-100">{analysis.topicReinforced}</p>
-          </div>
-        )}
-        {analysis.improvementTips && analysis.improvementTips.length > 0 && (
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Tips</p>
-            <ul className="space-y-1">
-              {analysis.improvementTips.map((tip, i) => (
-                <li key={i} className="text-sm text-gray-700 dark:text-gray-300 flex gap-2">
-                  <span className="text-blue-500">•</span> {tip}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {analysis.alternativeApproaches && analysis.alternativeApproaches.length > 0 && (
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Alternatives</p>
-            <ul className="space-y-1">
-              {analysis.alternativeApproaches.map((a, i) => (
-                <li key={i} className="text-sm text-gray-700 dark:text-gray-300 flex gap-2">
-                  <span className="text-purple-500">→</span> {a}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      ) : content}
+    </div>
   );
 }

@@ -10,8 +10,8 @@ export async function getSolution(problemDescription: string, userCode: string |
   return res.data;
 }
 
-export async function analyzeCode(problemDescription: string, userCode: string, language: string) {
-  const res = await apiClient.post('/ai/analyze', { problemDescription, userCode, language });
+export async function analyzeCode({ problemDescription, code, language }: { problemDescription: string; code: string; language: string }) {
+  const res = await apiClient.post('/ai/analyze', { problemDescription, userCode: code, language });
   return res.data;
 }
 

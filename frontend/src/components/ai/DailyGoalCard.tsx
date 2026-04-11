@@ -1,6 +1,8 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
+import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { Skeleton } from '../ui/Skeleton';
 
 interface Problem {
   title: string;
@@ -17,41 +19,68 @@ interface DailyGoalCardProps {
 export function DailyGoalCard({ motivation, problems = [], isLoading }: DailyGoalCardProps) {
   if (isLoading) {
     return (
-      <Card>
-        <CardContent>
-          <div className="h-24 flex items-center justify-center text-gray-400">Loading daily goal...</div>
-        </CardContent>
+      <Card variant="accent">
+        <Skeleton height={24} width={150} style={{ marginBottom: 'var(--space-4)' }} />
+        <Skeleton height={60} style={{ marginBottom: 'var(--space-6)' }} />
+        <Skeleton height={40} style={{ marginBottom: 'var(--space-2)' }} />
+        <Skeleton height={40} />
       </Card>
     );
   }
 
+  const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Today's Goal 🎯</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {motivation && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 leading-relaxed">{motivation}</p>
-        )}
-        <div className="space-y-2">
-          {problems.map((p) => (
-            <a
-              key={p.titleSlug}
-              href={`https://leetcode.com/problems/${p.titleSlug}/`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 border border-gray-200 dark:border-gray-800 transition-colors"
+    <Card variant="accent">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
+        <h3 className="h3">Today's Study Goal</h3>
+        <Badge variant="accent">{dateStr}</Badge>
+      </div>
+
+      <div style={{ 
+        fontStyle: 'italic', 
+        color: 'var(--text-secondary)', 
+        paddingLeft: 'var(--space-4)', 
+        borderLeft: '2px solid var(--accent)',
+        marginBottom: 'var(--space-8)',
+        fontSize: '15px',
+        lineHeight: 1.6
+      }}>
+        {motivation || "Focus on mastering tree traversals today. These problems build a foundation for more advanced graph algorithms."}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        {problems.map((p, i) => (
+          <div 
+            key={p.titleSlug} 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              padding: 'var(--space-4)',
+              background: 'var(--bg-tertiary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-subtle)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+              <Badge variant={p.difficulty.toLowerCase() as any}>{p.difficulty}</Badge>
+              <span style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: '14px' }}>{p.title}</span>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              style={{ color: 'var(--accent)', paddingRight: 0 }}
+              onClick={() => window.open(`https://leetcode.com/problems/${p.titleSlug}/`, '_blank')}
             >
-              <span className="text-sm font-medium dark:text-gray-100">{p.title}</span>
-              <Badge variant={p.difficulty as any}>{p.difficulty}</Badge>
-            </a>
-          ))}
-          {problems.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-4">No problems assigned yet.</p>
-          )}
-        </div>
-      </CardContent>
+              Solve →
+            </Button>
+          </div>
+        ))}
+        {problems.length === 0 && (
+          <p className="caption" style={{ textAlign: 'center', padding: 'var(--space-4)' }}>All goals completed! Great work.</p>
+        )}
+      </div>
     </Card>
   );
 }

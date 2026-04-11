@@ -1,47 +1,120 @@
 import React from 'react';
 import { useAuthStore } from '../store/useAuthStore';
-import { useQuery } from '@tanstack/react-query';
-import { getDailyProblem } from '../api/problems';
-import { getUserCalendar } from '../api/user';
+import { useStats } from '../hooks/useStats';
+import { useCalendar } from '../hooks/useCalendar';
+import { useDailyProblem } from '../hooks/useDailyProblem';
+import { useSubmissions } from '../hooks/useSubmissions';
+
 import { WelcomeCard } from '../components/home/WelcomeCard';
+import { SolvedRings } from '../components/charts/SolvedRings';
+import { CalendarHeatmap } from '../components/charts/CalendarHeatmap';
 import { DailyProblemCard } from '../components/home/DailyProblemCard';
-import { StreakCard } from '../components/home/StreakCard';
 import { WeakTopicsBadges } from '../components/home/WeakTopicsBadges';
+import { RecentSubmissions } from '../components/home/RecentSubmissions';
+import { Skeleton } from '../components/ui/Skeleton';
 
 export default function HomePage() {
   const user = useAuthStore((s) => s.user);
-  const token = useAuthStore((s) => s.token);
+  
+  const { data: stats, isLoading: statsLoading } = useStats();
+  const { data: calendar, isLoading: calendarLoading } = useCalendar();
+  const { data: daily, isLoading: dailyLoading } = useDailyProblem();
+  const { data: subs, isLoading: subsLoading } = useSubmissions(5);
 
-  const { data: calendarData } = useQuery({
-    queryKey: ['calendar'],
-    enabled: !!token,
-    queryFn: () => getUserCalendar(),
-    staleTime: 300_000,
-  });
+  const isLoading = statsLoading && calendarLoading && dailyLoading;
 
-  const { data: dailyData } = useQuery({
-    queryKey: ['daily'],
-    enabled: !!token,
-    queryFn: getDailyProblem,
-    staleTime: 3_600_000,
-  });
+  if (isLoading) {
+    return <HomePageSkeleton />;
+  }
+
+  const solvedData = stats?.solved || {};
+  const welcomeStats = {
+    streak: calendar?.streak || 0,
+    totalSolved: solvedData.totalSolved || solvedData.solvedProblem || 0,
+    globalRank: stats?.profile?.ranking || stats?.profile?.data?.matchedUser?.profile?.ranking || '—',
+  };
 
   return (
-    <div className="space-y-4">
-      <WelcomeCard user={user ?? undefined} />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {calendarData && (
-          <StreakCard
-            streak={calendarData.streak}
-            longestStreak={calendarData.longestStreak}
-            totalActiveDays={calendarData.totalActiveDays}
-          />
-        )}
-        {dailyData?.problem && <DailyProblemCard problem={dailyData.problem} />}
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(12, 1fr)',
+      gap: 'var(--space-6)',
+    }}>
+      {/* SECTION 1: Welcome Banner (full width) */}
+      <div style={{ gridColumn: 'span 12' }}>
+        <WelcomeCard user={user ?? undefined} stats={welcomeStats} />
       </div>
-      {user && (
-        <WeakTopicsBadges topics={(user as any).cachedWeakTopics || []} />
-      )}
+
+      {/* SECTION 2: Solved Rings (left top) */}
+      <div style={{ gridColumn: 'span 12', lg: 'span 8' } as any}>
+        <div className="home-col-left" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+          <SolvedRings 
+            delay={100}
+            stats={{
+              totalSolved: welcomeStats.totalSolved as number,
+              easySolved: solvedData.easySolved || 0,
+              mediumSolved: solvedData.mediumSolved || 0,
+              hardSolved: solvedData.hardSolved || 0,
+              totalEasy: solvedData.totalEasy || 100,
+              totalMedium: solvedData.totalMedium || 100,
+              totalHard: solvedData.totalHard || 100,
+            }} 
+          />
+          
+          {/* SECTION 3: Submission Calendar Heatmap (full width in left col) */}
+          <CalendarHeatmap delay={200} data={calendar} />
+          
+          {/* SECTION 6: Recent Submissions */}
+          <RecentSubmissions delay={300} submissions={subs?.submissions || []} />
+        </div>
+      </div>
+
+      {/* Right Column (Daily + Weak Topics) */}
+      <div style={{ gridColumn: 'span 12', lg: 'span 4' } as any}>
+        <div className="home-col-right" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+          {/* SECTION 4: Daily Problem Card */}
+          <DailyProblemCard 
+            delay={150} 
+            problem={daily?.problem} 
+            motivation="Consistency is key. Mastering this pattern will help you tackle Medium-level Array problems with ease."
+          />
+          
+          {/* SECTION 5: Weak Topics */}
+          <WeakTopicsBadges 
+            delay={250} 
+            topics={(user as any)?.cachedWeakTopics || ['Dynamic Programming', 'Graphs', 'Trie']} 
+          />
+        </div>
+      </div>
+
+      <style>{`
+        @media (min-width: 1024px) {
+          .home-col-left { grid-column: span 8; }
+          .home-col-right { grid-column: span 4; }
+        }
+        @media (max-width: 1023px) {
+          .home-col-left, .home-col-right { grid-column: span 12; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function HomePageSkeleton() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+      <Skeleton height={140} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 'var(--space-6)' }}>
+        <div style={{ gridColumn: 'span 8' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+            <Skeleton height={280} />
+            <Skeleton height={180} />
+          </div>
+        </div>
+        <div style={{ gridColumn: 'span 4' }}>
+          <Skeleton height={480} />
+        </div>
+      </div>
     </div>
   );
 }

@@ -90,17 +90,19 @@ userRouter.get(
   '/contest',
   asyncHandler(async (req, res) => {
     const username = await requireLeetcodeUsername(req.userId);
-    const [contestDetails, history] = await Promise.all([
-      getUserContest(username),
-      getUserContestHistory(username),
-    ]);
+    
+    // Fetch contest data with individual error handling to prevent route failure if user has no contest data
+    const contestDetails = await getUserContest(username).catch((err: any) => {
+      console.warn(`[alfa] Partial failure (contestDetails) for ${username}:`, err.message);
+      return {};
+    });
 
-    let contestHistory = history;
-    if (history.contestHistory) {
-      contestHistory = history.contestHistory;
-    } else if (history.data) {
-      contestHistory = history.data;
-    }
+    const historyResponse = await getUserContestHistory(username).catch((err: any) => {
+      console.warn(`[alfa] Partial failure (contestHistory) for ${username}:`, err.message);
+      return { contestHistory: [], data: [] };
+    });
+
+    let contestHistory = historyResponse.contestHistory || historyResponse.data || [];
     if (!Array.isArray(contestHistory)) {
       contestHistory = [];
     }
