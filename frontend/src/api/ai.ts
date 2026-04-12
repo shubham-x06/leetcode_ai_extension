@@ -22,5 +22,5 @@ export async function getDailyGoal() {
 
 export async function getRecommendation() {
   const res = await apiClient.get('/ai/recommend');
-  return res.data;
+  return res.data.recommendation || res.data;
 }

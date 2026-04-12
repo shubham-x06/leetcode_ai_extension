@@ -13,12 +13,23 @@ interface CalendarHeatmapProps {
 }
 
 export function CalendarHeatmap({ data, delay = 0 }: CalendarHeatmapProps) {
+  // Build a map keyed by YYYY-MM-DD (local date) for reliable matching
+  // LeetCode stores epoch timestamps as keys; they won't match midnight values exactly
   const submissionMap = useMemo(() => {
-    if (!data?.submissionCalendar) return {};
+    if (!data?.submissionCalendar) return {} as Record<string, number>;
     try {
-      return JSON.parse(data.submissionCalendar);
-    } catch (e) {
-      return {};
+      const raw: Record<string, number> = typeof data.submissionCalendar === 'string'
+        ? JSON.parse(data.submissionCalendar)
+        : data.submissionCalendar;
+      const byDate: Record<string, number> = {};
+      for (const [ts, count] of Object.entries(raw)) {
+        const d = new Date(Number(ts) * 1000);
+        const key = d.toISOString().slice(0, 10); // YYYY-MM-DD in UTC
+        byDate[key] = (byDate[key] || 0) + count;
+      }
+      return byDate;
+    } catch {
+      return {} as Record<string, number>;
     }
   }, [data?.submissionCalendar]);
 
@@ -39,7 +50,7 @@ export function CalendarHeatmap({ data, delay = 0 }: CalendarHeatmapProps) {
     let lastMonth = -1;
 
     for (let i = 0; i < 53 * 7; i++) {
-      const timestamp = Math.floor(currentDate.getTime() / 1000);
+      const timestamp = currentDate.toISOString().slice(0, 10); // YYYY-MM-DD key
       const count = submissionMap[timestamp] || 0;
       
       const dayData = {

@@ -130,26 +130,41 @@ aiRouter.get(
     const user = await User.findById(req.userId);
     if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
     
-    // Using simple logic since Alfa caching does caching. We do not strictly use the 'daily-goal-userId-date' cache key manually, we just call it.
-    // Wait, prompt says: "cache key includes userId + date string for daily reset". Let me just implement it simply.
     const weakTopics = user.cachedWeakTopics || [];
     const tagToUse = weakTopics[0]?.toLowerCase().replace(/\s+/g, '-') ?? 'dynamic-programming';
-    
+
+    // Respect user's target difficulty (Mixed = no filter)
     let difficulty: 'EASY' | 'MEDIUM' | 'HARD' | undefined;
     if (user.preferences?.targetDifficulty && user.preferences.targetDifficulty !== 'Mixed') {
       difficulty = user.preferences.targetDifficulty.toUpperCase() as 'EASY' | 'MEDIUM' | 'HARD';
     }
 
-    const problemList = await getProblemList({ 
-      tags: [tagToUse], 
-      difficulty,
-      limit: user.preferences?.dailyGoalCount || 3 
-    });
-    const pool = problemList.questions || [];
+    // Respect user's daily goal count (capped at 5 per schema)
+    const goalCount = Math.min(user.preferences?.dailyGoalCount || 3, 5);
+
+    // --- Try specific weak topic first ---
+    let pool: any[] = [];
+    const specificList = await getProblemList({ tags: [tagToUse], difficulty, limit: goalCount + 10 });
+    pool = specificList.questions || [];
+
+    // --- If not enough problems, fall back to broader popular tags (no topic restriction) ---
+    if (pool.length < goalCount) {
+      const broadSkip = Math.floor(Math.random() * 50);
+      const broadList = await getProblemList({ difficulty, limit: 50, skip: broadSkip });
+      const broadPool = broadList.questions || [];
+      // Merge, deduplicate, prioritising the specific results first
+      const seen = new Set(pool.map((p: any) => p.titleSlug));
+      for (const p of broadPool) {
+        if (!seen.has(p.titleSlug)) { pool.push(p); seen.add(p.titleSlug); }
+        if (pool.length >= goalCount + 5) break;
+      }
+    }
+
+    // Shuffle for variety and slice to exactly goalCount
+    pool = pool.sort(() => Math.random() - 0.5).slice(0, goalCount);
     
     const system = DAILY_GOAL_SYSTEM_PROMPT;
-    const userPrompt = `Topics: ${weakTopics.join(', ')}. Problems: ${JSON.stringify(pool)}`;
-    
+    const userPrompt = `Topics: ${weakTopics.join(', ')}. Target: ${goalCount} problems. Problems: ${JSON.stringify(pool)}`;
     const raw = await chatCompletion(system, userPrompt, 300);
     
     res.json({ motivation: raw, problems: pool });
@@ -163,23 +178,71 @@ aiRouter.get(
     if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
     
     const weakTopics = user.cachedWeakTopics || [];
-    const tagToUse = weakTopics[0]?.toLowerCase().replace(/\s+/g, '-') ?? 'dynamic-programming';
 
-    let difficulty: 'EASY' | 'MEDIUM' | 'HARD' | undefined = 'MEDIUM'; // fallback to Medium if mixed for recommendations
+    // Map weak topics to known LeetCode tag slugs with many problems
+    const POPULAR_TOPIC_MAP: Record<string, string> = {
+      'dynamic programming': 'dynamic-programming',
+      'graphs': 'graph',
+      'graph': 'graph',
+      'trees': 'tree',
+      'tree': 'tree',
+      'binary search': 'binary-search',
+      'array': 'array',
+      'string': 'string',
+      'hash table': 'hash-table',
+      'two pointers': 'two-pointers',
+      'sliding window': 'sliding-window',
+      'backtracking': 'backtracking',
+      'greedy': 'greedy',
+      'sorting': 'sorting',
+      'linked list': 'linked-list',
+      'stack': 'stack',
+      'queue': 'queue',
+      'heap': 'heap-priority-queue',
+      'bit manipulation': 'bit-manipulation',
+      'math': 'math',
+      'recursion': 'recursion',
+    };
+
+    // Use popular tags that definitely have 100+ problems; prefer second weak topic
+    const FALLBACK_TAGS = ['dynamic-programming', 'array', 'string', 'binary-search', 'graph', 'two-pointers', 'greedy', 'backtracking', 'tree', 'hash-table'];
+    const topicKey1 = weakTopics[1]?.toLowerCase();
+    const topicKey0 = weakTopics[0]?.toLowerCase();
+    const mappedTag = (topicKey1 && POPULAR_TOPIC_MAP[topicKey1])
+      || (topicKey0 && POPULAR_TOPIC_MAP[topicKey0])
+      || FALLBACK_TAGS[Math.floor(Date.now() / 60000) % FALLBACK_TAGS.length]; // rotate every minute
+
+    // Mixed = no difficulty filter. Otherwise respect user preference.
+    let difficulty: 'EASY' | 'MEDIUM' | 'HARD' | undefined;
     if (user.preferences?.targetDifficulty && user.preferences.targetDifficulty !== 'Mixed') {
       difficulty = user.preferences.targetDifficulty.toUpperCase() as 'EASY' | 'MEDIUM' | 'HARD';
     }
     
-    const probData = await getProblemList({ 
-      limit: 5, 
-      tags: [tagToUse], 
-      difficulty 
-    });
-    const pool = probData.questions || [];
+    // Use a time-seeded random skip so every refresh gets a different page
+    const randomSkip = Math.floor(Math.random() * 100);
+
+    const result = await getProblemList({ limit: 20, skip: randomSkip, tags: [mappedTag], difficulty });
+    let pool = result.questions || [];
+
+    // Safety net: if still small, query without topic tag
+    if (pool.length < 5) {
+      const fallbackSkip = Math.floor(Math.random() * 200);
+      const broadResult = await getProblemList({ limit: 30, skip: fallbackSkip, difficulty });
+      pool = broadResult.questions || [];
+    }
+
+    // Shuffle so AI picks from a varied set
+    pool = pool.sort(() => Math.random() - 0.5);
     
-    const raw = await chatCompletion(RECOMMEND_SYSTEM_PROMPT, `Pool: ${JSON.stringify(pool.slice(0, 5))}. Return JSON ONLY { "title": "...", "titleSlug": "...", "difficulty": "...", "reason": "..." }`, 200);
+    const raw = await chatCompletion(
+      RECOMMEND_SYSTEM_PROMPT,
+      `User's weak topics: ${weakTopics.join(', ')}. Target difficulty: ${user.preferences?.targetDifficulty || 'Mixed'}. Pick ONE problem from this pool that best matches the weak topics. Pool: ${JSON.stringify(pool.slice(0, 10))}. Return JSON ONLY: { "title": "...", "titleSlug": "...", "difficulty": "...", "reason": "..." }`,
+      250
+    );
     const parsed = parseJsonFromAi(raw);
     
-    res.json({ recommendation: parsed || { title: 'Two Sum', titleSlug: 'two-sum', difficulty: 'Easy', reason: 'Default fallback' } });
+    // Fallback: random item from shuffled pool
+    const fallback = pool[Math.floor(Math.random() * Math.min(pool.length, 5))] || { title: 'Two Sum', titleSlug: 'two-sum', difficulty: 'Easy', reason: 'A great starting point for building problem-solving skills.' };
+    res.json({ recommendation: parsed || fallback });
   })
 );

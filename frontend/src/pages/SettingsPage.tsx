@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { getMe, updatePreferences } from '../api/user';
@@ -17,11 +17,13 @@ export default function SettingsPage() {
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
 
+  const queryClient = useQueryClient();
+
   const { data: me, isLoading } = useQuery({
     queryKey: ['me'],
     enabled: !!token,
     queryFn: getMe,
-    staleTime: 60_000,
+    staleTime: 0, // always fresh so saved prefs show immediately
   });
 
   const [lang, setLang] = useState('Python');
@@ -29,21 +31,37 @@ export default function SettingsPage() {
   const [dailyGoal, setDailyGoal] = useState(3);
   const [showSaved, setShowSaved] = useState(false);
 
-  useEffect(() => {
-    if (me?.preferences) {
-      setLang(me.preferences.preferredLanguage || 'Python');
-      setDifficulty(me.preferences.targetDifficulty || 'Medium');
-      setDailyGoal(me.preferences.dailyGoalCount || 3);
-    }
-  }, [me]);
-
   const mutation = useMutation({
     mutationFn: (prefs: any) => updatePreferences(prefs),
-    onSuccess: () => {
+    onError: (error: any) => {
+      console.error('[SETTINGS] Save failed:', error);
+      alert('Failed to save preferences. Please try again.');
+    },
+    onSuccess: (data) => {
+      console.log('[SETTINGS] Save successful:', data);
+      // Update local state immediately from the server response
+      if (data?.preferences) {
+        setLang(data.preferences.preferredLanguage || lang);
+        setDifficulty(data.preferences.targetDifficulty || difficulty);
+        setDailyGoal(data.preferences.dailyGoalCount || dailyGoal);
+      }
+      // Invalidate 'me' cache so any other page re-fetches fresh prefs
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      // Also invalidate daily-goal so AI re-fetches with new prefs
+      queryClient.invalidateQueries({ queryKey: ['ai'] });
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 3000);
     },
   });
+
+  useEffect(() => {
+    // Only update local state if we have data AND we're not in the middle of a save
+    if (me?.preferences && !mutation.isPending) {
+      setLang(me.preferences.preferredLanguage || 'Python');
+      setDifficulty(me.preferences.targetDifficulty || 'Medium');
+      setDailyGoal(me.preferences.dailyGoalCount || 1);
+    }
+  }, [me, mutation.isPending]);
 
   const handleSave = () => {
     mutation.mutate({
@@ -156,7 +174,7 @@ export default function SettingsPage() {
                   <input 
                     type="range" 
                     min={1} 
-                    max={10} 
+                    max={5} 
                     value={dailyGoal} 
                     onChange={e => setDailyGoal(parseInt(e.target.value))}
                     style={{ width: '100%', accentColor: 'var(--accent)' }}

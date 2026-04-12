@@ -59,6 +59,10 @@ export function LanguagePie({ data = [], delay = 0 }: LanguagePieProps) {
             <Tooltip 
               contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: '12px' }}
               itemStyle={{ color: 'var(--text-primary)' }}
+              formatter={(value: any, name: any, props: any) => [
+                `${value} problems`,
+                props.payload?.languageName || name,
+              ]}
             />
           </PieChart>
         </ResponsiveContainer>

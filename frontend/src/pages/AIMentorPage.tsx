@@ -26,7 +26,8 @@ export default function AIMentorPage() {
   } = useQuery({
     queryKey: ['ai', 'recommendation'],
     queryFn: getRecommendation,
-    staleTime: 600000,
+    staleTime: 0,        // always fetch fresh so 'Get another' actually changes
+    refetchOnMount: true,
   });
 
   const analysisMutation = useMutation({

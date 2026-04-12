@@ -97,9 +97,14 @@ router.patch('/preferences', asyncHandler(async (req: Request, res: Response) =>
 
   for (const key of allowed) {
     if (req.body[key] !== undefined) {
-      updates[`preferences.${key}`] = req.body[key];
+      let val = req.body[key];
+      // Cast to number if it's the daily goal count
+      if (key === 'dailyGoalCount') val = Number(val);
+      updates[`preferences.${key}`] = val;
     }
   }
+
+  console.log('[DEBUG] Updating preferences for user:', req.userId, updates);
 
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: 'No valid preference fields provided', code: 'NO_FIELDS' });

@@ -25,7 +25,7 @@ export function RatingLine({ history = [], delay = 0 }: RatingLineProps) {
     <Card delay={delay} style={{ height: '100%', minHeight: 350, display: 'flex', flexDirection: 'column' }}>
       <h3 className="h3" style={{ marginBottom: 'var(--space-6)' }}>Rating History</h3>
       
-      <div style={{ flex: 1 }}>
+      <div style={{ height: 300, width: '100%' }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data}>
             <defs>

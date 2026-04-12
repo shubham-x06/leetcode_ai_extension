@@ -59,9 +59,9 @@ export function ProblemFilters({ filters, setFilters, resultsCount = 0 }: Proble
         onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.boxShadow = 'none'; }}
       >
         <option value="">All Difficulties</option>
-        <option value="EASY">Easy</option>
-        <option value="MEDIUM">Medium</option>
-        <option value="HARD">Hard</option>
+        <option value="Easy">Easy</option>
+        <option value="Medium">Medium</option>
+        <option value="Hard">Hard</option>
       </select>
 
       {/* Tags */}

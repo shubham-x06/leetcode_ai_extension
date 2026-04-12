@@ -36,7 +36,7 @@ export function ProblemCard({ problem, isBookmarked, onBookmarkToggle, delay = 0
         <Badge variant={problem.difficulty.toLowerCase() as any}>{problem.difficulty}</Badge>
         {problem.acRate !== undefined && (
           <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
-            {(problem.acRate * 100).toFixed(1)}% AC
+            {(problem.acRate).toFixed(1)}% AC
           </span>
         )}
       </div>
