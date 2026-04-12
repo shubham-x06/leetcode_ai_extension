@@ -3,6 +3,7 @@ import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './store/useAuthStore';
+import { useThemeStore } from './store/useThemeStore';
 import LoginPage from './pages/LoginPage';
 import OnboardingPage from './pages/OnboardingPage';
 import DashboardLayout from './pages/DashboardLayout';
@@ -19,11 +20,21 @@ const queryClient = new QueryClient({
 
 function App() {
   const { token, user } = useAuthStore();
+  const { theme } = useThemeStore();
+
+  React.useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'light') {
+      root.classList.add('light');
+    } else {
+      root.classList.remove('light');
+    }
+  }, [theme]);
 
   return (
     <QueryClientProvider client={queryClient}>
       <Toaster 
-        theme="dark" 
+        theme={theme} 
         position="top-right" 
         expand={false} 
         richColors 

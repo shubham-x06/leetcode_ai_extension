@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuthStore } from '../store/useAuthStore';
+import { useThemeStore } from '../store/useThemeStore';
 import { getMe, updatePreferences } from '../api/user';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { ThemeToggle } from '../components/ui/ThemeToggle';
 import { Badge } from '../components/ui/Badge';
 import { Skeleton } from '../components/ui/Skeleton';
 
@@ -166,6 +168,27 @@ export default function SettingsPage() {
                     Save Preferences
                   </Button>
                   {showSaved && <span style={{ color: 'var(--success)', fontSize: '14px', fontWeight: 500 }}>✓ Changes saved successfully</span>}
+                </div>
+              </div>
+            </Card>
+          </section>
+
+          {/* Section: Appearance */}
+          <section id="appearance">
+            <h3 className="h3" style={{ marginBottom: 'var(--space-4)' }}>Appearance</h3>
+            <Card>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>Theme Mode</h4>
+                  <p className="body" style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                    Switch between light and dark mode for your dashboard.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                    {useThemeStore.getState().theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+                  </span>
+                  <ThemeToggle />
                 </div>
               </div>
             </Card>

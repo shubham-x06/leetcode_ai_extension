@@ -7,6 +7,7 @@ import ProgressPage from './ProgressPage';
 import ContestPage from './ContestPage';
 import AIMentorPage from './AIMentorPage';
 import SettingsPage from './SettingsPage';
+import { ThemeToggle } from '../components/ui/ThemeToggle';
 
 // SVG Icons
 const HomeIcon = () => (
@@ -180,7 +181,10 @@ export default function DashboardLayout() {
           position: 'sticky', top: 0, zIndex: 50,
         }}>
           <h2 className="h2" style={{ fontFamily: 'var(--font-display)' }}>{pageTitle}</h2>
-          {user && <UserAvatar name={user.name} size={32} />}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+            <ThemeToggle />
+            {user && <UserAvatar name={user.name} size={32} />}
+          </div>
         </div>
 
         {/* Page Content */}

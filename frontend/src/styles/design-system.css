@@ -86,6 +86,40 @@
   --font-mono:    'JetBrains Mono', ui-monospace, Consolas, monospace;
 }
 
+/* ---- Light Mode Overrides ---- */
+.light {
+  /* Backgrounds */
+  --bg-primary:   #FAFAF9;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary:  #F3F4F6;
+  --bg-surface:   #E5E7EB;
+  --bg-elevated:  #FFFFFF;
+
+  /* Text */
+  --text-primary:   #1C1917;
+  --text-secondary: #44403C;
+  --text-muted:     #78716C;
+  --text-inverse:   #FFFFFF;
+
+  /* Accent */
+  --accent:        #4F46E5;
+  --accent-hover:  #4338CA;
+  --accent-glow:   rgba(79, 70, 229, 0.2);
+  --accent-subtle: rgba(79, 70, 229, 0.08);
+
+  /* Borders */
+  --border-subtle:  rgba(0, 0, 0, 0.05);
+  --border-default: rgba(0, 0, 0, 0.08);
+  --border-strong:  rgba(0, 0, 0, 0.15);
+  --border-accent:  rgba(79, 70, 229, 0.3);
+
+  /* Shadows */
+  --shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md:     0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg:     0 12px 24px rgba(0, 0, 0, 0.12);
+  --shadow-accent: 0 0 20px rgba(79, 70, 229, 0.15);
+}
+
 /* ---- Base ---- */
 html { scroll-behavior: smooth; }
 
