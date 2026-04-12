@@ -1,120 +1,75 @@
-import { Router } from 'express';
-import { z } from 'zod';
-import { AppError } from '../errors/AppError';
+import { Router, Request, Response } from 'express';
 import { asyncHandler } from '../lib/asyncHandler';
-import { getDailyProblem, getProblemList, getProblem, getOfficialSolution, AlfaApiError } from '../services/alfaApi';
+import {
+  getDailyProblem,
+  getProblemList,
+  getProblemDetail,
+  getOfficialSolution,
+  LeetCodeError,
+} from '../services/leetcodeGraphql';
 
-export const problemsRouter = Router();
+const router = Router();
 
-function unwrapDailyProblem(data: unknown): unknown {
-  if (!data || typeof data !== 'object') return data;
-  const o = data as Record<string, unknown>;
-  if (o.problem && typeof o.problem === 'object') return o.problem;
-  if (o.dailyQuestion && typeof o.dailyQuestion === 'object') return o.dailyQuestion;
-  if (o.data && typeof o.data === 'object') {
-    const inner = o.data as Record<string, unknown>;
-    if (inner.problem) return inner.problem;
-    return o.data;
+// GET /api/problems/daily
+router.get('/daily', asyncHandler(async (_req: Request, res: Response) => {
+  const problem = await getDailyProblem();
+  return res.json({ problem: problem.question, date: problem.date, link: problem.link });
+}));
+
+// GET /api/problems/list
+router.get('/list', asyncHandler(async (req: Request, res: Response) => {
+  const { difficulty, tags, limit, skip, search } = req.query;
+
+  const parsedLimit = Math.min(parseInt(limit as string, 10) || 20, 50);
+  const parsedSkip = parseInt(skip as string, 10) || 0;
+
+  let parsedDifficulty: 'EASY' | 'MEDIUM' | 'HARD' | undefined;
+  if (difficulty === 'Easy') parsedDifficulty = 'EASY';
+  else if (difficulty === 'Medium') parsedDifficulty = 'MEDIUM';
+  else if (difficulty === 'Hard') parsedDifficulty = 'HARD';
+
+  const parsedTags = tags
+    ? (tags as string).split(',').map(t => t.trim()).filter(Boolean)
+    : undefined;
+
+  const result = await getProblemList({
+    difficulty: parsedDifficulty,
+    tags: parsedTags,
+    limit: parsedLimit,
+    skip: parsedSkip,
+    searchQuery: search as string | undefined,
+  });
+
+  return res.json(result);
+}));
+
+// GET /api/problems/select
+router.get('/select', asyncHandler(async (req: Request, res: Response) => {
+  const { titleSlug } = req.query;
+
+  if (!titleSlug || typeof titleSlug !== 'string') {
+    return res.status(400).json({ error: 'titleSlug query parameter is required', code: 'MISSING_PARAM' });
   }
-  return data;
-}
 
-problemsRouter.get(
-  '/daily',
-  asyncHandler(async (_req, res) => {
-    try {
-      const data = await getDailyProblem();
-      res.json({ problem: unwrapDailyProblem(data) });
-    } catch (e: any) {
-      throw new AppError(502, e.message || 'Upstream LeetCode proxy failed', 'ALFA_ERROR');
-    }
-  })
-);
+  const problem = await getProblemDetail(titleSlug);
+  return res.json({ problem });
+}));
 
-problemsRouter.get(
-  '/list',
-  asyncHandler(async (req, res) => {
-    try {
-      const rawLimit = Number(req.query.limit) || 20;
-      const limit = Math.min(50, Math.max(1, rawLimit));
-      const skip = Math.max(0, Number(req.query.skip) || 0);
+// GET /api/problems/official-solution
+router.get('/official-solution', asyncHandler(async (req: Request, res: Response) => {
+  const { titleSlug } = req.query;
 
-      let tags = req.query.tags as string | undefined;
-      if (tags) {
-        tags = tags.replace(/\s+/g, '+').replace(/,/g, '+');
-      }
-
-      let difficulty = req.query.difficulty as string | undefined;
-      if (difficulty) {
-        const d = difficulty.toUpperCase();
-        if (d === 'EASY' || d === 'MEDIUM' || d === 'HARD') difficulty = d;
-      }
-      
-      const search = req.query.search as string | undefined;
-
-      const data = await getProblemList({ limit, skip, tags, difficulty, search: search?.trim() });
-      
-      const arr = data.problemsetQuestionList || data.data?.problemsetQuestionList || data.problems || [];
-      const total = data.totalQuestions || data.data?.totalQuestions || data.total || arr.length;
-      
-      res.json({ problems: arr, total });
-    } catch (e: any) {
-      throw new AppError(502, e.message || 'Upstream LeetCode proxy failed', 'ALFA_ERROR');
-    }
-  })
-);
-
-problemsRouter.get(
-  '/select',
-  asyncHandler(async (req, res) => {
-    const schema = z.object({ titleSlug: z.string().min(1) });
-    const { titleSlug } = schema.parse(req.query);
-    
-    try {
-      const data = await getProblem(titleSlug);
-      res.json(data);
-    } catch (e: any) {
-      throw new AppError(502, e.message || 'Upstream LeetCode proxy failed', 'ALFA_ERROR');
-    }
-  })
-);
-
-function extractSolutionContent(data: unknown): string | null {
-  if (data == null) return null;
-  if (typeof data === 'string') return data;
-  if (typeof data === 'object') {
-    const o = data as Record<string, unknown>;
-    if (typeof o.content === 'string') return o.content;
-    if (o.solution && typeof o.solution === 'object') {
-      const s = o.solution as Record<string, unknown>;
-      if (typeof s.content === 'string') return s.content;
-    }
-    if (o.data && typeof o.data === 'object') {
-      return extractSolutionContent(o.data);
-    }
+  if (!titleSlug || typeof titleSlug !== 'string') {
+    return res.status(400).json({ error: 'titleSlug query parameter is required', code: 'MISSING_PARAM' });
   }
-  return null;
-}
 
-problemsRouter.get(
-  '/official-solution',
-  asyncHandler(async (req, res) => {
-    const schema = z.object({ titleSlug: z.string().min(1) });
-    const { titleSlug } = schema.parse(req.query);
-    
-    try {
-      const data = await getOfficialSolution(titleSlug);
-      const content = extractSolutionContent(data);
-      if (content == null || content === '') {
-        throw new AppError(404, 'No official solution available', 'NO_OFFICIAL_SOLUTION');
-      }
-      res.json({ solution: { content } });
-    } catch (e: any) {
-      if (e instanceof AppError) throw e;
-      if (e instanceof AlfaApiError && e.status === 404) {
-        throw new AppError(404, 'No official solution available', 'NO_OFFICIAL_SOLUTION');
-      }
-      throw new AppError(502, e.message || '', 'ALFA_ERROR');
-    }
-  })
-);
+  const solution = await getOfficialSolution(titleSlug);
+
+  if (!solution) {
+    return res.status(404).json({ error: 'No official solution available for this problem', code: 'NO_SOLUTION' });
+  }
+
+  return res.json({ solution });
+}));
+
+export const problemsRouter = router;

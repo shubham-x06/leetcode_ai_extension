@@ -11,7 +11,7 @@ import {
   DAILY_GOAL_SYSTEM_PROMPT,
   RECOMMEND_SYSTEM_PROMPT
 } from '../lib/constants';
-import { getProblemList } from '../services/alfaApi';
+import { getProblemList } from '../services/leetcodeGraphql';
 
 export const aiRouter = Router();
 
@@ -132,11 +132,20 @@ aiRouter.get(
     
     // Using simple logic since Alfa caching does caching. We do not strictly use the 'daily-goal-userId-date' cache key manually, we just call it.
     // Wait, prompt says: "cache key includes userId + date string for daily reset". Let me just implement it simply.
-    const weakTopics = user.cachedWeakTopics;
-    const tag = weakTopics.length ? weakTopics[0] : '';
+    const weakTopics = user.cachedWeakTopics || [];
+    const tagToUse = weakTopics[0]?.toLowerCase().replace(/\s+/g, '-') ?? 'dynamic-programming';
     
-    const problemList = await getProblemList({ tags: tag ? tag.replace(/\s+/g, '+') : undefined, limit: 3 });
-    const pool = (problemList.problemsetQuestionList || problemList.data?.problemsetQuestionList || []).slice(0, 3);
+    let difficulty: 'EASY' | 'MEDIUM' | 'HARD' | undefined;
+    if (user.preferences?.targetDifficulty && user.preferences.targetDifficulty !== 'Mixed') {
+      difficulty = user.preferences.targetDifficulty.toUpperCase() as 'EASY' | 'MEDIUM' | 'HARD';
+    }
+
+    const problemList = await getProblemList({ 
+      tags: [tagToUse], 
+      difficulty,
+      limit: user.preferences?.dailyGoalCount || 3 
+    });
+    const pool = problemList.questions || [];
     
     const system = DAILY_GOAL_SYSTEM_PROMPT;
     const userPrompt = `Topics: ${weakTopics.join(', ')}. Problems: ${JSON.stringify(pool)}`;
@@ -153,11 +162,20 @@ aiRouter.get(
     const user = await User.findById(req.userId);
     if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
     
-    const tag = user.cachedWeakTopics[0] || '';
-    const diff = user.preferences?.targetDifficulty === 'Mixed' ? undefined : user.preferences?.targetDifficulty;
+    const weakTopics = user.cachedWeakTopics || [];
+    const tagToUse = weakTopics[0]?.toLowerCase().replace(/\s+/g, '-') ?? 'dynamic-programming';
+
+    let difficulty: 'EASY' | 'MEDIUM' | 'HARD' | undefined = 'MEDIUM'; // fallback to Medium if mixed for recommendations
+    if (user.preferences?.targetDifficulty && user.preferences.targetDifficulty !== 'Mixed') {
+      difficulty = user.preferences.targetDifficulty.toUpperCase() as 'EASY' | 'MEDIUM' | 'HARD';
+    }
     
-    const probData = await getProblemList({ limit: 5, tags: tag ? tag.replace(/\s+/g, '+') : undefined, difficulty: diff });
-    const pool = probData.problemsetQuestionList || probData.data?.problemsetQuestionList || [];
+    const probData = await getProblemList({ 
+      limit: 5, 
+      tags: [tagToUse], 
+      difficulty 
+    });
+    const pool = probData.questions || [];
     
     const raw = await chatCompletion(RECOMMEND_SYSTEM_PROMPT, `Pool: ${JSON.stringify(pool.slice(0, 5))}. Return JSON ONLY { "title": "...", "titleSlug": "...", "difficulty": "...", "reason": "..." }`, 200);
     const parsed = parseJsonFromAi(raw);

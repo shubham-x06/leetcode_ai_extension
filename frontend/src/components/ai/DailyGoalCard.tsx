@@ -30,6 +30,12 @@ export function DailyGoalCard({ motivation, problems = [], isLoading }: DailyGoa
 
   const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
+  const cleanMotivation = (motivation || "Focus on mastering tree traversals today. These problems build a foundation for more advanced graph algorithms.")
+    .replace(/\*\*Motivational Paragraph\*\*[:]?/gi, '')
+    .replace(/\*\*Ordered Problem List.*?\*\*/gi, '')
+    .split(/\*\*.*?\*\*/)[0] // Take only the first part before any other header
+    .trim();
+
   return (
     <Card variant="accent">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
@@ -46,7 +52,7 @@ export function DailyGoalCard({ motivation, problems = [], isLoading }: DailyGoa
         fontSize: '15px',
         lineHeight: 1.6
       }}>
-        {motivation || "Focus on mastering tree traversals today. These problems build a foundation for more advanced graph algorithms."}
+        {cleanMotivation}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>

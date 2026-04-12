@@ -5,6 +5,8 @@ import { AppError } from '../errors/AppError';
 import { User, IUser } from '../models/User';
 import { signUserToken } from '../services/jwt';
 import { asyncHandler } from '../lib/asyncHandler';
+import { getUserProfile, LeetCodeError } from '../services/leetcodeGraphql';
+
 
 export const publicAuthRouter = Router();
 export const protectedAuthRouter = Router();
@@ -78,6 +80,18 @@ protectedAuthRouter.post(
     const user = await User.findById(req.userId);
     if (!user) {
       throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
+    }
+
+    try {
+      await getUserProfile(leetcodeUsername);
+    } catch (error) {
+      if (error instanceof LeetCodeError && error.code === 'USER_NOT_FOUND') {
+        return res.status(404).json({
+          error: 'LeetCode username not found or profile is private. Make sure your LeetCode profile is set to public.',
+          code: 'LEETCODE_USER_NOT_FOUND',
+        });
+      }
+      throw error;
     }
     
     user.leetcodeUsername = leetcodeUsername;

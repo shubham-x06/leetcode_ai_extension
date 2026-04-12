@@ -1,8 +1,6 @@
-import { Router } from 'express';
-import { z } from 'zod';
-import { AppError } from '../errors/AppError';
+import { Router, Request, Response } from 'express';
 import { asyncHandler } from '../lib/asyncHandler';
-import { User, normalizeBookmarkDifficulty } from '../models/User';
+import { User } from '../models/User';
 import {
   getUserProfile,
   getUserSolved,
@@ -10,204 +8,140 @@ import {
   getUserLanguages,
   getUserCalendar,
   getUserContest,
-  getUserContestHistory,
-  getUserSubmissions
-} from '../services/alfaApi';
+  getUserSubmissions,
+  getUserProgress,
+  LeetCodeError,
+} from '../services/leetcodeGraphql';
 import { computeStreaks } from '../lib/computeStreaks';
 import { computeWeakTopics } from '../lib/computeWeakTopics';
 
-export const userRouter = Router();
+const router = Router();
 
-async function requireLeetcodeUsername(userId: string): Promise<string> {
-  const u = await User.findById(userId).lean();
-  const n = u?.leetcodeUsername?.trim();
-  if (!n) {
-    throw new AppError(400, 'Set your LeetCode username in settings.', 'NO_LC_USER');
+// GET /api/user/me
+router.get('/me', asyncHandler(async (req: Request, res: Response) => {
+  const user = await User.findById(req.userId).select('-__v -googleId');
+  if (!user) {
+    return res.status(404).json({ error: 'User not found', code: 'USER_NOT_FOUND' });
   }
-  return n;
-}
+  return res.json(user);
+}));
 
-userRouter.get(
-  '/me',
-  asyncHandler(async (req, res) => {
-    const user = await User.findById(req.userId).select('-__v -googleId -_id');
-    if (!user) {
-      throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
+// GET /api/user/stats
+router.get('/stats', asyncHandler(async (req: Request, res: Response) => {
+  const user = await User.findById(req.userId);
+  if (!user?.leetcodeUsername) {
+    return res.status(400).json({ error: 'LeetCode username not linked', code: 'NO_LEETCODE_USERNAME' });
+  }
+
+  const username = user.leetcodeUsername;
+
+  // Fetch all in parallel — no sequential waterfall
+  const [profile, solved, skills, languages, progress] = await Promise.all([
+    getUserProfile(username),
+    getUserSolved(username),
+    getUserSkills(username),
+    getUserLanguages(username),
+    getUserProgress(username),
+  ]);
+
+  // Update cachedWeakTopics asynchronously — do not await
+  const weakTopics = computeWeakTopics(skills);
+  User.findByIdAndUpdate(req.userId, { cachedWeakTopics: weakTopics }).catch(() => {});
+
+  return res.json({ profile, solved, skills, languages, progress });
+}));
+
+// GET /api/user/calendar
+router.get('/calendar', asyncHandler(async (req: Request, res: Response) => {
+  const user = await User.findById(req.userId);
+  if (!user?.leetcodeUsername) {
+    return res.status(400).json({ error: 'LeetCode username not linked', code: 'NO_LEETCODE_USERNAME' });
+  }
+
+  const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+  const calendar = await getUserCalendar(user.leetcodeUsername, year);
+  const streaks = computeStreaks(calendar.submissionCalendar);
+
+  return res.json({ ...calendar, ...streaks });
+}));
+
+// GET /api/user/contest
+router.get('/contest', asyncHandler(async (req: Request, res: Response) => {
+  const user = await User.findById(req.userId);
+  if (!user?.leetcodeUsername) {
+    return res.status(400).json({ error: 'LeetCode username not linked', code: 'NO_LEETCODE_USERNAME' });
+  }
+
+  const result = await getUserContest(user.leetcodeUsername);
+  return res.json(result);
+}));
+
+// GET /api/user/submissions
+router.get('/submissions', asyncHandler(async (req: Request, res: Response) => {
+  const user = await User.findById(req.userId);
+  if (!user?.leetcodeUsername) {
+    return res.status(400).json({ error: 'LeetCode username not linked', code: 'NO_LEETCODE_USERNAME' });
+  }
+
+  const rawLimit = parseInt(req.query.limit as string, 10);
+  const limit = isNaN(rawLimit) ? 10 : Math.min(rawLimit, 20);
+
+  const submissions = await getUserSubmissions(user.leetcodeUsername, limit);
+  return res.json({ submissions });
+}));
+
+// PATCH /api/user/preferences
+router.patch('/preferences', asyncHandler(async (req: Request, res: Response) => {
+  const allowed = ['targetDifficulty', 'dailyGoalCount', 'preferredLanguage', 'theme'];
+  const updates: Record<string, unknown> = {};
+
+  for (const key of allowed) {
+    if (req.body[key] !== undefined) {
+      updates[`preferences.${key}`] = req.body[key];
     }
-    res.json(user);
-  })
-);
+  }
 
-userRouter.get(
-  '/stats',
-  asyncHandler(async (req, res) => {
-    const username = await requireLeetcodeUsername(req.userId);
-    const [profile, solved, skill, language] = await Promise.all([
-      getUserProfile(username),
-      getUserSolved(username),
-      getUserSkills(username),
-      getUserLanguages(username),
-    ]);
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'No valid preference fields provided', code: 'NO_FIELDS' });
+  }
 
-    res.json({
-      profile,
-      solved,
-      skills: skill,
-      languages: language,
-    });
+  const user = await User.findByIdAndUpdate(
+    req.userId,
+    { $set: updates },
+    { new: true, runValidators: true }
+  );
 
-    const weak = computeWeakTopics(skill);
-    if (weak.length) {
-      User.findByIdAndUpdate(req.userId, { cachedWeakTopics: weak }).catch(() => {});
-    }
-  })
-);
+  return res.json({ success: true, preferences: user?.preferences });
+}));
 
-userRouter.get(
-  '/calendar',
-  asyncHandler(async (req, res) => {
-    const username = await requireLeetcodeUsername(req.userId);
-    const year = typeof req.query.year === 'string' && req.query.year ? req.query.year : '';
-    const data = await getUserCalendar(username, year);
+// POST /api/user/bookmarks
+router.post('/bookmarks', asyncHandler(async (req: Request, res: Response) => {
+  const { titleSlug, title, difficulty } = req.body;
 
-    let submissionCalendarJson = '';
-    if (data.submissionCalendar) {
-      submissionCalendarJson = typeof data.submissionCalendar === 'string' ? data.submissionCalendar : JSON.stringify(data.submissionCalendar);
-    } else {
-      submissionCalendarJson = JSON.stringify(data);
-    }
+  if (!titleSlug || !title || !difficulty) {
+    return res.status(400).json({ error: 'titleSlug, title, and difficulty are required', code: 'MISSING_FIELDS' });
+  }
 
-    const streakData = computeStreaks(submissionCalendarJson);
+  const user = await User.findById(req.userId);
+  if (!user) return res.status(404).json({ error: 'User not found', code: 'USER_NOT_FOUND' });
 
-    res.json({
-      submissionCalendar: submissionCalendarJson,
-      ...streakData
-    });
-  })
-);
+  const alreadyBookmarked = user.bookmarkedProblems.some(b => b.titleSlug === titleSlug);
+  if (alreadyBookmarked) {
+    return res.status(409).json({ error: 'Already bookmarked', code: 'ALREADY_BOOKMARKED' });
+  }
 
-userRouter.get(
-  '/contest',
-  asyncHandler(async (req, res) => {
-    const username = await requireLeetcodeUsername(req.userId);
-    
-    // Fetch contest data with individual error handling to prevent route failure if user has no contest data
-    const contestDetails = await getUserContest(username).catch((err: any) => {
-      console.warn(`[alfa] Partial failure (contestDetails) for ${username}:`, err.message);
-      return {};
-    });
+  user.bookmarkedProblems.push({ titleSlug, title, difficulty, addedAt: new Date() });
+  await user.save();
 
-    const historyResponse = await getUserContestHistory(username).catch((err: any) => {
-      console.warn(`[alfa] Partial failure (contestHistory) for ${username}:`, err.message);
-      return { contestHistory: [], data: [] };
-    });
+  return res.json({ success: true });
+}));
 
-    let contestHistory = historyResponse.contestHistory || historyResponse.data || [];
-    if (!Array.isArray(contestHistory)) {
-      contestHistory = [];
-    }
+// DELETE /api/user/bookmarks/:titleSlug
+router.delete('/bookmarks/:titleSlug', asyncHandler(async (req: Request, res: Response) => {
+  await User.findByIdAndUpdate(req.userId, {
+    $pull: { bookmarkedProblems: { titleSlug: req.params.titleSlug } },
+  });
+  return res.json({ success: true });
+}));
 
-    res.json({
-      contestDetails: contestDetails || {},
-      contestHistory,
-    });
-  })
-);
-
-userRouter.get(
-  '/submissions',
-  asyncHandler(async (req, res) => {
-    const username = await requireLeetcodeUsername(req.userId);
-    const limit = Math.min(20, Math.max(1, Number(req.query.limit) || 10));
-    const data = await getUserSubmissions(username, limit);
-
-    const rows: unknown[] = [];
-    const visit = (node: unknown, depth = 0): void => {
-      if (depth > 20 || node == null) return;
-      if (Array.isArray(node)) {
-        node.forEach((x) => visit(x, depth + 1));
-        return;
-      }
-      if (typeof node !== 'object') return;
-      const o = node as Record<string, unknown>;
-      if (typeof o.title === 'string' && typeof o.titleSlug === 'string') {
-        rows.push({
-          title: o.title,
-          titleSlug: o.titleSlug,
-          timestamp: String(o.timestamp ?? o.date ?? ''),
-          statusDisplay: typeof o.statusDisplay === 'string' ? o.statusDisplay : 'Accepted',
-          lang: typeof o.lang === 'string' ? o.lang : typeof o.language === 'string' ? o.language : '',
-        });
-      }
-      for (const v of Object.values(o)) visit(v, depth + 1);
-    };
-    visit(data);
-
-    res.json({ submissions: rows.slice(0, limit) });
-  })
-);
-
-userRouter.patch(
-  '/preferences',
-  asyncHandler(async (req, res) => {
-    const schema = z.object({
-      targetDifficulty: z.enum(['Easy', 'Medium', 'Hard', 'Mixed']).optional(),
-      dailyGoalCount: z.number().min(1).max(5).optional(),
-      preferredLanguage: z.string().optional(),
-      theme: z.enum(['light', 'dark']).optional(),
-    });
-    const parsed = schema.parse(req.body);
-
-    const user = await User.findById(req.userId);
-    if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
-
-    user.preferences = {
-      ...user.preferences,
-      ...parsed
-    };
-    await user.save();
-    
-    res.json({ success: true, preferences: user.preferences });
-  })
-);
-
-userRouter.post(
-  '/bookmarks',
-  asyncHandler(async (req, res) => {
-    const schema = z.object({
-      titleSlug: z.string().min(1),
-      title: z.string().min(1),
-      difficulty: z.string().min(1)
-    });
-    const { titleSlug, title, difficulty } = schema.parse(req.body);
-
-    const user = await User.findById(req.userId);
-    if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
-
-    if (user.bookmarkedProblems.some((b) => b.titleSlug === titleSlug)) {
-      throw new AppError(409, 'Already bookmarked', 'ALREADY_BOOKMARKED');
-    }
-
-    user.bookmarkedProblems.push({
-      titleSlug,
-      title,
-      difficulty: normalizeBookmarkDifficulty(difficulty),
-      addedAt: new Date(),
-    });
-    await user.save();
-    res.json({ success: true });
-  })
-);
-
-userRouter.delete(
-  '/bookmarks/:titleSlug',
-  asyncHandler(async (req, res) => {
-    const slug = req.params.titleSlug;
-    const user = await User.findById(req.userId);
-    if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
-
-    user.bookmarkedProblems = user.bookmarkedProblems.filter((b) => b.titleSlug !== slug);
-    await user.save();
-    res.json({ success: true });
-  })
-);
+export const userRouter = router;
