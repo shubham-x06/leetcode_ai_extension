@@ -1,6 +1,1 @@
-body { margin: 0; font-family: sans-serif; background: #fff; border-radius: 12px; }
-.header { background: #2563eb; color: #fff; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 12px 12px 0 0; }
-.content { padding: 16px; }
-button { background: #3b82f6; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; margin-right: 8px; margin-bottom: 12px; }
-button:hover { background: #2563eb; }
-#response-box { margin-top: 12px; font-size: 14px; color: #333; line-height: 1.5; white-space: pre-wrap; max-height: 350px; overflow-y: auto; }
+/* widget.css is now intentionally empty — all styles live in widget.html <style> block */
