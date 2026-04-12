@@ -34,6 +34,11 @@ export default function HomePage() {
     globalRank: stats?.profile?.profile?.ranking || stats?.profile?.ranking || stats?.profile?.data?.matchedUser?.profile?.ranking || '—',
   };
 
+  const progress = stats?.progress || {};
+  const totalByDiff = progress.totalByDifficulty || [];
+  
+  const getCount = (diff: string) => totalByDiff.find((q: any) => q.difficulty === diff)?.count || 100;
+
   return (
     <div style={{
       display: 'grid',
@@ -55,9 +60,9 @@ export default function HomePage() {
               easySolved: solvedData.easySolved || 0,
               mediumSolved: solvedData.mediumSolved || 0,
               hardSolved: solvedData.hardSolved || 0,
-              totalEasy: solvedData.totalEasy || 100,
-              totalMedium: solvedData.totalMedium || 100,
-              totalHard: solvedData.totalHard || 100,
+              totalEasy: getCount('Easy'),
+              totalMedium: getCount('Medium'),
+              totalHard: getCount('Hard'),
             }} 
           />
           

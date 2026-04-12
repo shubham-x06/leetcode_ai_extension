@@ -64,7 +64,7 @@ export function DailyProblemCard({ problem, motivation, delay = 0 }: DailyProble
         {problem.acRate !== undefined && (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <span className="caption" style={{ fontSize: '11px' }}>
-              Acceptance Rate: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{(problem.acRate * 100).toFixed(1)}%</span>
+              Acceptance Rate: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{problem.acRate.toFixed(1)}%</span>
             </span>
           </div>
         )}

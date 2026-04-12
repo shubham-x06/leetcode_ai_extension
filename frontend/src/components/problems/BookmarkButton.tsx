@@ -1,4 +1,5 @@
 import React from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { addBookmark, removeBookmark } from '../../api/user';
 import { Spinner } from '../ui/Spinner';
 
@@ -12,23 +13,34 @@ interface BookmarkButtonProps {
 }
 
 export function BookmarkButton({ titleSlug, title, difficulty, isBookmarked, onToggle, style }: BookmarkButtonProps) {
-  const [loading, setLoading] = React.useState(false);
+  const queryClient = useQueryClient();
 
-  async function handleClick(e: React.MouseEvent) {
-    e.stopPropagation(); // Prevent card click
-    setLoading(true);
-    try {
-      if (isBookmarked) {
-        await removeBookmark(titleSlug);
-        onToggle?.(false);
-      } else {
-        await addBookmark({ titleSlug, title, difficulty });
-        onToggle?.(true);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+  const addMutation = useMutation({
+    mutationFn: (data: { titleSlug: string; title: string; difficulty: string }) => addBookmark(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      onToggle?.(true);
+    },
+    onError: (err) => console.error('[BOOKMARK] Add failed:', err),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (slug: string) => removeBookmark(slug),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      onToggle?.(false);
+    },
+    onError: (err) => console.error('[BOOKMARK] Remove failed:', err),
+  });
+
+  const loading = addMutation.isPending || removeMutation.isPending;
+
+  function handleClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (isBookmarked) {
+      removeMutation.mutate(titleSlug);
+    } else {
+      addMutation.mutate({ titleSlug, title, difficulty });
     }
   }
 

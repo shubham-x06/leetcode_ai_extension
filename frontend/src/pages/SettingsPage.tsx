@@ -84,7 +84,6 @@ export default function SettingsPage() {
           <SettingsNavLink label="Preferences" />
           <SettingsNavLink label="Connected Accounts" />
           <SettingsNavLink label="Notifications" />
-          <SettingsNavLink label="Appearance" />
           <div style={{ margin: 'var(--space-4) 0', borderTop: '1px solid var(--border-subtle)' }} />
           <SettingsNavLink label="Danger Zone" danger />
         </div>
@@ -191,26 +190,7 @@ export default function SettingsPage() {
             </Card>
           </section>
 
-          {/* Section: Appearance */}
-          <section id="appearance">
-            <h3 className="h3" style={{ marginBottom: 'var(--space-4)' }}>Appearance</h3>
-            <Card>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>Theme Mode</h4>
-                  <p className="body" style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-                    Switch between light and dark mode for your dashboard.
-                  </p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                    {useThemeStore.getState().theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
-                  </span>
-                  <ThemeToggle />
-                </div>
-              </div>
-            </Card>
-          </section>
+
 
           {/* Section: Danger Zone */}
           <section>

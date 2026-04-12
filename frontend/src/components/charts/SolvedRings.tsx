@@ -41,7 +41,7 @@ export function SolvedRings({ stats, delay = 0 }: SolvedRingsProps) {
         <div style={{ display: 'flex', justifyContent: 'space-around', width: '100%', gap: 'var(--space-2)' }}>
           {solved.map((item, idx) => (
             <div key={item.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-              <div style={{ width: 80, height: 80 }}>
+              <div style={{ width: 80, height: 80, position: 'relative' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -49,7 +49,7 @@ export function SolvedRings({ stats, delay = 0 }: SolvedRingsProps) {
                         { value: item.value },
                         { value: Math.max(0, item.total - item.value) }
                       ]}
-                      innerRadius={28}
+                      innerRadius={30}
                       outerRadius={38}
                       startAngle={90}
                       endAngle={-270}
@@ -58,10 +58,23 @@ export function SolvedRings({ stats, delay = 0 }: SolvedRingsProps) {
                       stroke="none"
                     >
                       <Cell fill={item.color} />
-                      <Cell fill={item.subtle} />
+                      <Cell fill={item.subtle} stroke={item.subtle} strokeWidth={1} />
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>
+                {/* Percentage Center */}
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: 'var(--text-primary)',
+                  opacity: 0.9
+                }}>
+                  {item.total > 0 ? Math.round((item.value / item.total) * 100) : 0}%
+                </div>
               </div>
               <div style={{ 
                 fontFamily: 'var(--font-display)', 

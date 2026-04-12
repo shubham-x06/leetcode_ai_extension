@@ -12,11 +12,11 @@ interface Problem {
 
 interface DailyGoalCardProps {
   motivation?: string;
-  problems?: Problem[];
   isLoading?: boolean;
+  onRefresh?: () => void;
 }
 
-export function DailyGoalCard({ motivation, problems = [], isLoading }: DailyGoalCardProps) {
+export function DailyGoalCard({ motivation, problems = [], isLoading, onRefresh }: DailyGoalCardProps) {
   if (isLoading) {
     return (
       <Card variant="accent">
@@ -39,7 +39,33 @@ export function DailyGoalCard({ motivation, problems = [], isLoading }: DailyGoa
   return (
     <Card variant="accent">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
-        <h3 className="h3">Today's Study Goal</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+          <h3 className="h3">Today's Study Goal</h3>
+          {onRefresh && (
+            <button 
+              onClick={(e) => { e.preventDefault(); onRefresh(); }}
+              className="refresh-btn"
+              title="Refresh recommendations"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '4px',
+                borderRadius: '50%',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-subtle)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none'; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 2v6h-6M3 12a9 9 0 0115-6.7L21 8M3 22v-6h6M21 12a9 9 0 01-15 6.7L3 16"/>
+              </svg>
+            </button>
+          )}
+        </div>
         <Badge variant="accent">{dateStr}</Badge>
       </div>
 

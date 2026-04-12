@@ -13,10 +13,14 @@ export default function AIMentorPage() {
   const [code, setCode] = useState('');
   const [language, setLanguage] = useState('javascript');
 
-  const { data: dailyGoal, isLoading: goalLoading } = useQuery({
+  const { 
+    data: dailyGoal, 
+    isLoading: goalLoading,
+    refetch: refreshGoal
+  } = useQuery({
     queryKey: ['ai', 'daily-goal'],
     queryFn: getDailyGoal,
-    staleTime: 3600000,
+    staleTime: 5000, // 5 seconds - allow it to be fresh often
   });
 
   const { 
@@ -46,6 +50,7 @@ export default function AIMentorPage() {
         isLoading={goalLoading} 
         motivation={dailyGoal?.motivation} 
         problems={dailyGoal?.problems} 
+        onRefresh={refreshGoal}
       />
 
       {/* 2. Personalized Recommendation */}

@@ -20,6 +20,15 @@ export default function ProgressPage() {
   const languages = stats?.languages?.languageProblemCount || stats?.languages || [];
   const submissions = subsData?.submissions || [];
 
+  const acStats = stats?.solved?.acSubmissionNum?.find((s: any) => s.difficulty === 'All');
+  const totalStats = stats?.solved?.totalSubmissionNum?.find((s: any) => s.difficulty === 'All');
+
+  const globalAcRate = totalStats?.submissions > 0 
+    ? ((acStats?.submissions / totalStats?.submissions) * 100).toFixed(1) + '%' 
+    : '0%';
+  const totalAttempted = totalStats?.submissions || 0;
+  const ranking = stats?.profile?.profile?.ranking || stats?.profile?.ranking || stats?.progress?.ranking || '—';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       {/* Top Section: Charts */}
@@ -35,22 +44,22 @@ export default function ProgressPage() {
       {/* Stats Strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-6)' }}>
         <StatCard 
-          label="Beat (Speed)" 
-          value="84.2%" 
-          sub="faster than others" 
+          label="Global Rank" 
+          value={typeof ranking === 'number' ? ranking.toLocaleString() : ranking} 
+          sub="current standing" 
           accent 
           delay={300} 
         />
         <StatCard 
           label="Acceptance Rate" 
-          value="62.5%" 
+          value={globalAcRate} 
           sub="avg. success rate" 
           delay={400} 
         />
         <StatCard 
           label="Attempted" 
-          value={stats?.solved?.totalSolved + 12 || 142} 
-          sub="including non-accepted" 
+          value={totalAttempted} 
+          sub="total submissions" 
           delay={500} 
         />
       </div>

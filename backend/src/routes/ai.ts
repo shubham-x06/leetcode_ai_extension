@@ -147,16 +147,19 @@ aiRouter.get(
     const specificList = await getProblemList({ tags: [tagToUse], difficulty, limit: goalCount + 10 });
     pool = specificList.questions || [];
 
-    // --- If not enough problems, fall back to broader popular tags (no topic restriction) ---
+    // --- If not enough problems, fall back to broader popular tags ---
     if (pool.length < goalCount) {
-      const broadSkip = Math.floor(Math.random() * 50);
-      const broadList = await getProblemList({ difficulty, limit: 50, skip: broadSkip });
+      const broadSkip = Math.floor(Math.random() * 200); // Increased range
+      const broadList = await getProblemList({ difficulty, limit: 100, skip: broadSkip });
       const broadPool = broadList.questions || [];
-      // Merge, deduplicate, prioritising the specific results first
+      // Merge and deduplicate
       const seen = new Set(pool.map((p: any) => p.titleSlug));
       for (const p of broadPool) {
-        if (!seen.has(p.titleSlug)) { pool.push(p); seen.add(p.titleSlug); }
-        if (pool.length >= goalCount + 5) break;
+        if (!seen.has(p.titleSlug)) { 
+          pool.push(p); 
+          seen.add(p.titleSlug); 
+        }
+        if (pool.length >= goalCount + 10) break;
       }
     }
 
@@ -218,16 +221,16 @@ aiRouter.get(
       difficulty = user.preferences.targetDifficulty.toUpperCase() as 'EASY' | 'MEDIUM' | 'HARD';
     }
     
-    // Use a time-seeded random skip so every refresh gets a different page
-    const randomSkip = Math.floor(Math.random() * 100);
+    // Use a unique random skip so every refresh gets a fresh batch
+    const randomSkip = Math.floor(Math.random() * 300); // Much larger range
 
-    const result = await getProblemList({ limit: 20, skip: randomSkip, tags: [mappedTag], difficulty });
+    const result = await getProblemList({ limit: 40, skip: randomSkip, tags: [mappedTag], difficulty });
     let pool = result.questions || [];
 
-    // Safety net: if still small, query without topic tag
+    // Safety net: if still small, query without topic tag with a very large skip
     if (pool.length < 5) {
-      const fallbackSkip = Math.floor(Math.random() * 200);
-      const broadResult = await getProblemList({ limit: 30, skip: fallbackSkip, difficulty });
+      const fallbackSkip = Math.floor(Math.random() * 1000);
+      const broadResult = await getProblemList({ limit: 50, skip: fallbackSkip, difficulty });
       pool = broadResult.questions || [];
     }
 

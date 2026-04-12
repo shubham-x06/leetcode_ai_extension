@@ -99,21 +99,18 @@ export function CalendarHeatmap({ data, delay = 0 }: CalendarHeatmapProps) {
       </div>
 
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: 'var(--space-4)' }}>
-        {/* Day Labels */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '18px', paddingRight: '4px' }}>
-          {['Mon', 'Wed', 'Fri'].map(day => (
-            <div key={day} className="caption" style={{ height: 11, fontSize: '9px', lineHeight: '11px', display: 'flex', alignItems: 'center' }}>
-              {day}
-            </div>
-          ))}
-        </div>
-
         {/* Heatmap Grid */}
         <div style={{ flex: 1 }}>
           {/* Month Labels */}
-          <div style={{ display: 'flex', height: 18, position: 'relative' }}>
+          <div style={{ display: 'flex', height: 18, position: 'relative', marginBottom: '4px' }}>
             {monthLabels.map((ml, i) => (
-              <div key={i} className="caption" style={{ position: 'absolute', left: ml.index * 13, fontSize: '10px' }}>
+              <div key={i} className="caption" style={{ 
+                position: 'absolute', 
+                left: ml.index * 13, 
+                fontSize: '10px',
+                whiteSpace: 'nowrap',
+                color: 'var(--text-muted)'
+              }}>
                 {ml.label}
               </div>
             ))}
