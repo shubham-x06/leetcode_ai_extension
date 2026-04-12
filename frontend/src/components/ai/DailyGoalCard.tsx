@@ -12,6 +12,7 @@ interface Problem {
 
 interface DailyGoalCardProps {
   motivation?: string;
+  problems?: Problem[];
   isLoading?: boolean;
   onRefresh?: () => void;
 }
