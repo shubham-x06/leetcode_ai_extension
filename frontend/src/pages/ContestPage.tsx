@@ -91,7 +91,7 @@ export default function ContestPage() {
             </thead>
             <tbody>
               {history.slice().reverse().map((c: any, i: number) => {
-                const diff = i < history.length - 1 ? Math.round(c.rating - history[history.length - 1 - (i + 1)].rating) : 0;
+                const diff = i < history.length - 1 ? Math.round((c?.rating || 0) - (history[history.length - 1 - (i + 1)]?.rating || 0)) : 0;
                 return (
                   <tr 
                     key={i} 
@@ -105,20 +105,20 @@ export default function ContestPage() {
                     onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.01)'}
                   >
                     <td style={{ padding: 'var(--space-5) var(--space-2)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {c.contest.title}
+                      {c?.contest?.title || 'Unknown Contest'}
                     </td>
                     <td style={{ padding: 'var(--space-5) var(--space-2)', color: 'var(--text-muted)' }}>
-                      {new Date(c.contest.startTime * 1000).toLocaleDateString()}
+                      {c?.contest?.startTime ? new Date(c.contest.startTime * 1000).toLocaleDateString() : 'N/A'}
                     </td>
                     <td style={{ padding: 'var(--space-5) var(--space-2)' }}>
-                      <Badge variant="neutral">{c.ranking ? `#${c.ranking}` : '—'}</Badge>
+                      <Badge variant="neutral">{c?.ranking ? `#${c.ranking}` : '—'}</Badge>
                     </td>
                     <td style={{ padding: 'var(--space-5) var(--space-2)' }}>
                       <span style={{ fontWeight: 500 }}>{c.problemsSolved ?? '—'}/4</span>
                     </td>
                     <td style={{ padding: 'var(--space-5) var(--space-2)', textAlign: 'right' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{Math.round(c.rating)}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{Math.round(c?.rating || 0)}</span>
                         {diff !== 0 && (
                           <span style={{ fontSize: '11px', color: diff > 0 ? 'var(--success)' : 'var(--error)' }}>
                             {diff > 0 ? '↑' : '↓'} {Math.abs(diff)}

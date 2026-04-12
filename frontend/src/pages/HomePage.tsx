@@ -31,7 +31,7 @@ export default function HomePage() {
   const welcomeStats = {
     streak: calendar?.streak || 0,
     totalSolved: solvedData.totalSolved || solvedData.solvedProblem || 0,
-    globalRank: stats?.profile?.ranking || stats?.profile?.data?.matchedUser?.profile?.ranking || '—',
+    globalRank: stats?.profile?.profile?.ranking || stats?.profile?.ranking || stats?.profile?.data?.matchedUser?.profile?.ranking || '—',
   };
 
   return (

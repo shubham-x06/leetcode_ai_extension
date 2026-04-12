@@ -12,13 +12,13 @@ interface RatingLineProps {
 }
 
 export function RatingLine({ history = [], delay = 0 }: RatingLineProps) {
-  const data = (history || [])
-    .sort((a, b) => a.contest.startTime - b.contest.startTime)
+  const data = [...(history || [])]
+    .sort((a, b) => (a?.contest?.startTime || 0) - (b?.contest?.startTime || 0))
     .map(c => ({
-      name: c.contest.title,
-      rating: Math.round(c.rating),
-      rank: c.ranking,
-      date: new Date(c.contest.startTime * 1000).toLocaleDateString(undefined, { month: 'short', year: '2y' } as any),
+      name: c?.contest?.title || 'Unknown Contest',
+      rating: Math.round(c?.rating || 0),
+      rank: c?.ranking,
+      date: c?.contest?.startTime ? new Date(c.contest.startTime * 1000).toLocaleDateString(undefined, { month: 'short', year: '2-digit' } as any) : 'N/A',
     }));
 
   return (

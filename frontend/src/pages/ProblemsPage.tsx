@@ -36,7 +36,7 @@ export default function ProblemsPage() {
     staleTime: 120_000,
   });
 
-  const problems = data?.problems || [];
+  const problems = data?.questions || data?.problems || [];
   const total = data?.total || 0;
 
   const handleFilterChange = (newFilters: Filters) => {
