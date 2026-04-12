@@ -104,7 +104,7 @@ router.patch('/preferences', asyncHandler(async (req: Request, res: Response) =>
     }
   }
 
-  console.log('[DEBUG] Updating preferences for user:', req.userId, updates);
+
 
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: 'No valid preference fields provided', code: 'NO_FIELDS' });

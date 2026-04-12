@@ -110,29 +110,6 @@ export default function LoginPage() {
 
         {/* Divider + footer */}
         <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--space-5)', textAlign: 'center' }}>
-          <button 
-            onClick={() => {
-              login('mock-jwt-token-123', { 
-                name: 'Demo User', 
-                email: 'demo@example.com', 
-                avatarUrl: '', 
-                leetcodeUsername: 'shubham-x06' 
-              });
-              navigate('/');
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--accent)',
-              fontSize: '13px',
-              fontWeight: 500,
-              cursor: 'pointer',
-              marginBottom: 'var(--space-4)',
-              textDecoration: 'underline'
-            }}
-          >
-            Access Demo Dashboard
-          </button>
           <p className="caption">LeetCode AI Companion · Built for serious learners</p>
         </div>
       </div>

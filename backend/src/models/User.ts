@@ -89,17 +89,14 @@ const UserSchema = new Schema<IUser>(
   { timestamps: true }
 );
 
-UserSchema.index({ leetcodeUsername: 1 }, { sparse: true });
-
-export default mongoose.model<IUser>('User', UserSchema);
 export const User = mongoose.model<IUser>('User', UserSchema);
 
 export type UserDocument = IUser & { _id: Types.ObjectId };
 
 /** Map API/Alfa difficulty string to stored bookmark difficulty */
 export function normalizeBookmarkDifficulty(raw: string): BookmarkDifficulty {
-  const u = raw.toUpperCase();
-  if (u === 'EASY' || u === 'Easy') return 'Easy';
-  if (u === 'MEDIUM' || u === 'Medium') return 'Medium';
+  const u = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  if (u === 'Easy') return 'Easy';
+  if (u === 'Medium') return 'Medium';
   return 'Hard';
 }

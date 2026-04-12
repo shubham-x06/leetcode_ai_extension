@@ -81,9 +81,9 @@
   --transition-slow: 0.4s  cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Fonts */
-  --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono:    'JetBrains Mono', ui-monospace, Consolas, monospace;
+  --font-sans:    'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Clash Display', sans-serif;
+  --font-mono:    'Fira Code', 'Cascadia Code', monospace;
 }
 
 /* ---- Light Mode Overrides ---- */

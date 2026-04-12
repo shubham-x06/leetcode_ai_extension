@@ -46,7 +46,8 @@ mongoose.connect(process.env.MONGODB_URI!)
   })
   .catch((err) => {
     console.error('MongoDB connection failed:', err.message);
-    console.log('Running without DB connection (Demo mode)');
+    console.error('Cannot start server without database connection. Exiting.');
+    process.exit(1);
   });
 
 app.listen(port, () => {

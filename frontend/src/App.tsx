@@ -19,8 +19,30 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  const { token, user } = useAuthStore();
+  const { token, user, _rehydrated } = useAuthStore();
   const { theme } = useThemeStore();
+
+  // Do not render routes until storage rehydration is complete
+  // This prevents redirect to /login on every page reload
+  if (!_rehydrated) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg-primary)',
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: '50%',
+          border: '3px solid rgba(99,102,241,0.3)',
+          borderTopColor: 'var(--accent)',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   React.useEffect(() => {
     const root = window.document.documentElement;

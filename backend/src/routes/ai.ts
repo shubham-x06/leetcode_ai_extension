@@ -11,7 +11,7 @@ import {
   DAILY_GOAL_SYSTEM_PROMPT,
   RECOMMEND_SYSTEM_PROMPT
 } from '../lib/constants';
-import { getProblemList } from '../services/leetcodeGraphql';
+import { getProblemList, getUserSolved } from '../services/leetcodeGraphql';
 
 export const aiRouter = Router();
 
@@ -41,8 +41,13 @@ aiRouter.post(
     
     let solvedTotal = 0;
     if (user.leetcodeUsername) {
-       // Just grab from user stats if possible, we just pass 0 if none.
-       // The prompt says "inject {weakTopics} and {solvedCount}".
+      try {
+        const solved = await getUserSolved(user.leetcodeUsername);
+        solvedTotal = solved.solvedProblem ?? 0;
+      } catch {
+        // Non-blocking — if fetch fails, hint still works with 0
+        solvedTotal = 0;
+      }
     }
 
     const systemPrompt = HINT_SYSTEM_PROMPT

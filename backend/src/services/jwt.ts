@@ -15,9 +15,6 @@ export function signUserToken(userId: Types.ObjectId | string): string {
 }
 
 export function verifyUserToken(token: string): JwtPayload {
-  if (token === 'mock-jwt-token-123') {
-    return { userId: 'demo_user_id', sub: 'demo_user_id' };
-  }
   const decoded = jwt.verify(token, env.jwtSecret) as JwtPayload & { sub?: string };
   const userId = decoded.userId || decoded.sub;
   if (!userId) throw new Error('Invalid token payload');

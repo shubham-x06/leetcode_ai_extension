@@ -50,9 +50,8 @@ export default function HomePage() {
         <WelcomeCard user={user ?? undefined} stats={welcomeStats} />
       </div>
 
-      {/* SECTION 2: Solved Rings (left top) */}
-      <div style={{ gridColumn: 'span 12', lg: 'span 8' } as any}>
-        <div className="home-col-left" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+      {/* Left column */}
+      <div className="home-col-left" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
           <SolvedRings 
             delay={100}
             stats={{
@@ -71,12 +70,10 @@ export default function HomePage() {
           
           {/* SECTION 6: Recent Submissions */}
           <RecentSubmissions delay={300} submissions={subs?.submissions || []} />
-        </div>
       </div>
 
       {/* Right Column (Daily + Weak Topics) */}
-      <div style={{ gridColumn: 'span 12', lg: 'span 4' } as any}>
-        <div className="home-col-right" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+      <div className="home-col-right" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
           {/* SECTION 4: Daily Problem Card */}
           <DailyProblemCard 
             delay={150} 
@@ -89,7 +86,6 @@ export default function HomePage() {
             delay={250} 
             topics={(user as any)?.cachedWeakTopics || ['Dynamic Programming', 'Graphs', 'Trie']} 
           />
-        </div>
       </div>
 
       <style>{`

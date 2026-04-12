@@ -14,7 +14,8 @@ async function callAi(endpoint) {
 
         const title = 'Context extracted problem'; // Minimal fallback
         
-        const res = await fetch(`http://localhost:3001/api/ai/${endpoint}`, {
+        const API_BASE_URL = 'http://localhost:3001'; // TODO: Update to prod URL
+        const res = await fetch(`${API_BASE_URL}/api/ai/${endpoint}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
