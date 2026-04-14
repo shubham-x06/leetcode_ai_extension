@@ -34,7 +34,6 @@ const langSelect     = document.getElementById('lang-select');
   } else {
     showAuthGate();
   }
-  setupMinimize();
   setupTabs();
   setupButtons();
 })();
@@ -111,32 +110,7 @@ async function pingBackend() {
   }
 }
 
-// Drag is handled entirely by the parent page (content_script.js)
-// via a transparent overlay div — zero postMessage lag.
-
-// ── Minimize — tells PARENT to resize iframe container ────
-function setupMinimize() {
-  const btn = document.getElementById('minimize-btn');
-
-  btn.addEventListener('click', () => {
-    minimized = !minimized;
-
-    // Tell parent (content_script) to resize the iframe
-    window.parent.postMessage({
-      type:   'LEETAI_RESIZE',
-      height: minimized ? COLLAPSED_HEIGHT : EXPANDED_HEIGHT,
-    }, '*');
-
-    // Flip icon
-    if (minimized) {
-      btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>`;
-      btn.title = 'Restore';
-    } else {
-      btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
-      btn.title = 'Minimize';
-    }
-  });
-}
+// Minimize and drag are handled entirely by content_script.js in the parent page.
 
 // ── Tabs ──────────────────────────────────────────────────
 function setupTabs() {

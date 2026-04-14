@@ -34,20 +34,60 @@
     });
     container.appendChild(iframe);
 
-    // ── Drag handle overlay (sits on top of the header) ───
-    // This lives in the PARENT page so there's zero cross-frame lag.
+    // ── Drag handle overlay (covers header minus the button area) ───
     const dragHandle = document.createElement('div');
     Object.assign(dragHandle.style, {
-      position:  'absolute',
-      top:       '0',
-      left:      '0',
-      right:     '0',
-      height:    HEADER_HEIGHT + 'px',
-      zIndex:    '1',          // above iframe, below nothing else
-      cursor:    'grab',
-      userSelect:'none',
+      position:   'absolute',
+      top:        '0',
+      left:       '0',
+      right:      '44px',          // leave room for minimize button on the right
+      height:     HEADER_HEIGHT + 'px',
+      zIndex:     '2',
+      cursor:     'grab',
+      userSelect: 'none',
     });
     container.appendChild(dragHandle);
+
+    // ── Minimize button — lives in parent page, no iframe needed ─────
+    let minimized   = false;
+    const minBtn    = document.createElement('div');
+    minBtn.title    = 'Minimize';
+    Object.assign(minBtn.style, {
+      position:        'absolute',
+      top:             '12px',
+      right:           '12px',
+      width:           '28px',
+      height:          '28px',
+      background:      'rgba(255,255,255,0.05)',
+      border:          '1px solid rgba(255,255,255,0.12)',
+      borderRadius:    '7px',
+      display:         'flex',
+      alignItems:      'center',
+      justifyContent:  'center',
+      cursor:          'pointer',
+      zIndex:          '3',
+      color:           '#9CA3AF',
+      transition:      'background 0.15s',
+      boxSizing:       'border-box',
+    });
+    minBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+    minBtn.addEventListener('mouseenter', () => { minBtn.style.background = 'rgba(255,255,255,0.12)'; minBtn.style.color = '#F1F1EE'; });
+    minBtn.addEventListener('mouseleave', () => { minBtn.style.background = 'rgba(255,255,255,0.05)'; minBtn.style.color = '#9CA3AF'; });
+    minBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      minimized = !minimized;
+      container.style.transition = 'height 0.22s cubic-bezier(0.4,0,0.2,1)';
+      container.style.height = (minimized ? HEADER_HEIGHT : EXPANDED_HEIGHT) + 'px';
+      setTimeout(() => { container.style.transition = ''; }, 250);
+      if (minimized) {
+        minBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>`;
+        minBtn.title = 'Restore';
+      } else {
+        minBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+        minBtn.title = 'Minimize';
+      }
+    });
+    container.appendChild(minBtn);
 
     document.body.appendChild(container);
 
