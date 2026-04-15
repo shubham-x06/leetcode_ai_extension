@@ -136,7 +136,7 @@ aiRouter.get(
     if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
     
     const weakTopics = user.cachedWeakTopics || [];
-    const tagToUse = weakTopics[0]?.toLowerCase().replace(/\s+/g, '-') ?? 'dynamic-programming';
+    const tagToUse = weakTopics[0] ? weakTopics[0].toLowerCase().replace(/[()]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : 'dynamic-programming';
 
     // Respect user's target difficulty (Mixed = no filter)
     let difficulty: 'EASY' | 'MEDIUM' | 'HARD' | undefined;
@@ -187,38 +187,13 @@ aiRouter.get(
     
     const weakTopics = user.cachedWeakTopics || [];
 
-    // Map weak topics to known LeetCode tag slugs with many problems
-    const POPULAR_TOPIC_MAP: Record<string, string> = {
-      'dynamic programming': 'dynamic-programming',
-      'graphs': 'graph',
-      'graph': 'graph',
-      'trees': 'tree',
-      'tree': 'tree',
-      'binary search': 'binary-search',
-      'array': 'array',
-      'string': 'string',
-      'hash table': 'hash-table',
-      'two pointers': 'two-pointers',
-      'sliding window': 'sliding-window',
-      'backtracking': 'backtracking',
-      'greedy': 'greedy',
-      'sorting': 'sorting',
-      'linked list': 'linked-list',
-      'stack': 'stack',
-      'queue': 'queue',
-      'heap': 'heap-priority-queue',
-      'bit manipulation': 'bit-manipulation',
-      'math': 'math',
-      'recursion': 'recursion',
-    };
-
+    const slugify = (name: string) => name.toLowerCase().replace(/[()]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    
     // Use popular tags that definitely have 100+ problems; prefer second weak topic
     const FALLBACK_TAGS = ['dynamic-programming', 'array', 'string', 'binary-search', 'graph', 'two-pointers', 'greedy', 'backtracking', 'tree', 'hash-table'];
-    const topicKey1 = weakTopics[1]?.toLowerCase();
-    const topicKey0 = weakTopics[0]?.toLowerCase();
-    const mappedTag = (topicKey1 && POPULAR_TOPIC_MAP[topicKey1])
-      || (topicKey0 && POPULAR_TOPIC_MAP[topicKey0])
-      || FALLBACK_TAGS[Math.floor(Date.now() / 60000) % FALLBACK_TAGS.length]; // rotate every minute
+    const mappedTag1 = weakTopics[1] ? slugify(weakTopics[1]) : null;
+    const mappedTag0 = weakTopics[0] ? slugify(weakTopics[0]) : null;
+    const mappedTag = mappedTag1 || mappedTag0 || FALLBACK_TAGS[Math.floor(Date.now() / 60000) % FALLBACK_TAGS.length]; // rotate every minute
 
     // Mixed = no difficulty filter. Otherwise respect user preference.
     let difficulty: 'EASY' | 'MEDIUM' | 'HARD' | undefined;

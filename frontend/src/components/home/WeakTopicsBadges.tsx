@@ -53,7 +53,7 @@ export function WeakTopicsBadges({ topics = [], delay = 0 }: WeakTopicsProps) {
     if (typeof t === 'string') {
       return {
         name: t,
-        slug: t.toLowerCase().replace(/\s+/g, '-'),
+        slug: t.toLowerCase().replace(/[()]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
         problemsSolved: 0,
         solveRate: 5,
       };
