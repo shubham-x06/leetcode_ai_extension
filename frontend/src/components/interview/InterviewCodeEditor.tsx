@@ -76,7 +76,7 @@ export function InterviewCodeEditor({ code, onChange, language, disabled }: Prop
           onKeyDown={handleKeyDown}
           disabled={disabled}
           spellCheck={false}
-          placeholder={\`# Write your solution here\\n# Think out loud in the chat panel\\n\\ndef solution():\\n    pass\`}
+          placeholder={`# Write your solution here\n# Think out loud in the chat panel\n\ndef solution():\n    pass`}
           style={{
             flex: 1, padding: '14px var(--space-4)',
             background: '#0A0A14', color: '#E2E8F0',
@@ -96,7 +96,7 @@ export function InterviewCodeEditor({ code, onChange, language, disabled }: Prop
         fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono, monospace)',
         flexShrink: 0,
       }}>
-        {code.split('\\n').length} lines · {code.length} chars
+        {code.split('\n').length} lines · {code.length} chars
       </div>
     </div>
   );

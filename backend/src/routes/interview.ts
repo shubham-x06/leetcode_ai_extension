@@ -21,32 +21,8 @@ interviewRouter.post('/start', asyncHandler(async (req, res) => {
   const weakTopics = user.cachedWeakTopics || [];
   const prefDifficulty = user.preferences?.targetDifficulty || 'Mixed';
 
-  // Map topic names to leetcode tag slugs
-  const TOPIC_MAP: Record<string, string> = {
-    'dynamic programming': 'dynamic-programming',
-    'graphs': 'graph', 'graph': 'graph',
-    'trees': 'tree', 'tree': 'tree',
-    'binary search': 'binary-search',
-    'array': 'array', 'arrays': 'array',
-    'string': 'string', 'strings': 'string',
-    'hash table': 'hash-table',
-    'two pointers': 'two-pointers',
-    'sliding window': 'sliding-window',
-    'backtracking': 'backtracking',
-    'greedy': 'greedy',
-    'linked list': 'linked-list',
-    'stack': 'stack', 'queue': 'queue',
-    'heap': 'heap-priority-queue',
-    'bit manipulation': 'bit-manipulation',
-    'math': 'math', 'recursion': 'recursion',
-    'sorting': 'sorting',
-  };
-
-  const FALLBACK_TAGS = ['array', 'string', 'hash-table', 'two-pointers', 'dynamic-programming'];
-
   function resolveTag(topic: string): string {
-    const key = topic.toLowerCase();
-    return TOPIC_MAP[key] || FALLBACK_TAGS[Math.floor(Math.random() * FALLBACK_TAGS.length)];
+    return topic.toLowerCase().replace(/[()]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   }
 
   // Problem 1: from first weak topic, easier difficulty
@@ -63,16 +39,26 @@ interviewRouter.post('/start', asyncHandler(async (req, res) => {
   else { diff1 = 'EASY'; diff2 = 'MEDIUM'; } // Mixed: escalate
 
   async function fetchRandomProblem(tag: string, difficulty: 'EASY' | 'MEDIUM' | 'HARD') {
-    const skip = Math.floor(Math.random() * 80);
-    const list = await getProblemList({ tags: [tag], difficulty, limit: 20, skip });
+    // Try asking for 100 problems of this tag across 0 skip to maximize pool without breaking bounds
+    const list = await getProblemList({ tags: [tag], difficulty, limit: 100, skip: 0 });
     const pool = (list.questions || []).filter((p: any) => !p.isPaidOnly);
-    if (pool.length === 0) {
-      // Fallback: no tag filter
-      const fallback = await getProblemList({ difficulty, limit: 20, skip: Math.floor(Math.random() * 200) });
-      const fp = (fallback.questions || []).filter((p: any) => !p.isPaidOnly);
-      return fp[Math.floor(Math.random() * fp.length)] || null;
+    
+    if (pool.length > 0) {
+      return pool[Math.floor(Math.random() * pool.length)];
     }
-    return pool[Math.floor(Math.random() * pool.length)];
+
+    // Fallback: no tag filter, pick a random skip safely assuming minimum 200 exist
+    const fallback = await getProblemList({ difficulty, limit: 50, skip: Math.floor(Math.random() * 50) });
+    const fp = (fallback.questions || []).filter((p: any) => !p.isPaidOnly);
+    
+    if (fp.length > 0) {
+      return fp[Math.floor(Math.random() * fp.length)];
+    }
+    
+    // Absolute fallback
+    const absoluteFallback = await getProblemList({ difficulty, limit: 50, skip: 0 });
+    const afp = (absoluteFallback.questions || []).filter((p: any) => !p.isPaidOnly);
+    return afp[Math.floor(Math.random() * afp.length)] || null;
   }
 
   const [p1Meta, p2Meta] = await Promise.all([
@@ -166,20 +152,20 @@ interviewRouter.post('/message', asyncHandler(async (req, res) => {
   const minutesLeft = Math.floor(timeRemainingSeconds / 60);
   const tags = currentProblem.topicTags.map(t => t.name).join(', ');
 
-  const INTERVIEWER_SYSTEM = \`You are a senior FAANG software engineer conducting a real technical interview.
+  const INTERVIEWER_SYSTEM = `You are a senior FAANG software engineer conducting a real technical interview.
 
-CURRENT PROBLEM (Problem \${problemIndex + 1} of 2):
-Title: \${currentProblem.title}
-Difficulty: \${currentProblem.difficulty}
-Topics: \${tags}
+CURRENT PROBLEM (Problem ${problemIndex + 1} of 2):
+Title: ${currentProblem.title}
+Difficulty: ${currentProblem.difficulty}
+Topics: ${tags}
 Problem Statement:
-\${currentProblem.content.slice(0, 1500)}
+${currentProblem.content.slice(0, 1500)}
 
 CANDIDATE'S CURRENT CODE:
-\${userCode ? userCode.slice(0, 2000) : '(no code written yet)'}
+${userCode ? userCode.slice(0, 2000) : '(no code written yet)'}
 
-TIME REMAINING: \${minutesLeft} minutes
-PHASE: \${phase}
+TIME REMAINING: ${minutesLeft} minutes
+PHASE: ${phase}
 
 YOUR BEHAVIOR RULES — FOLLOW STRICTLY:
 1. You are a professional, encouraging but rigorous interviewer.
@@ -206,7 +192,7 @@ QUESTION BANK (rotate through these based on context):
 - "Is there a way to optimize this further?"
 - "Walk me through a specific example using your code."
 - "What would happen if the input was empty or null?"
-- "How would you test this function?"\`;
+- "How would you test this function?"`;
 
   // Use the full conversation history for context
   const groqMessages: any[] = [
@@ -267,18 +253,18 @@ interviewRouter.post('/feedback', asyncHandler(async (req, res) => {
   const minutesTotal = Math.floor(totalDurationSeconds / 60);
 
   const transcriptText = transcript
-    .map(m => \`\${m.role === 'user' ? 'CANDIDATE' : 'INTERVIEWER'}: \${m.content}\`)
-    .join('\\n');
+    .map(m => `${m.role === 'user' ? 'CANDIDATE' : 'INTERVIEWER'}: ${m.content}`)
+    .join('\n');
 
   const problemSummary = problems.map((p, i) =>
-    \`Problem \${i + 1}: \${p.title} (\${p.difficulty}) — Topics: \${p.topicTags.map(t => t.name).join(', ')}\`
-  ).join('\\n');
+    `Problem ${i + 1}: ${p.title} (${p.difficulty}) — Topics: ${p.topicTags.map(t => t.name).join(', ')}`
+  ).join('\n');
 
   const codeSummary = finalCode.map((c, i) =>
-    \`Problem \${i + 1} Final Code:\\n\${c.slice(0, 1500) || '(no code submitted)'}\`
-  ).join('\\n\\n');
+    `Problem ${i + 1} Final Code:\n${c.slice(0, 1500) || '(no code submitted)'}`
+  ).join('\n\n');
 
-  const FEEDBACK_SYSTEM = \`You are a senior FAANG hiring manager evaluating a technical interview.
+  const FEEDBACK_SYSTEM = `You are a senior FAANG hiring manager evaluating a technical interview.
 Analyze the interview transcript and code, then generate a structured JSON performance report.
 
 RESPOND WITH VALID JSON ONLY. No markdown. No backticks. No explanation outside the JSON.
@@ -311,24 +297,24 @@ Required JSON shape:
   ],
   "recommendedTopics": ["<topic to study 1>", "<topic to study 2>", "<topic to study 3>"],
   "nextSteps": "<1-2 sentence actionable advice for the candidate>"
-}\`;
+}`;
 
-  const userPrompt = \`
+  const userPrompt = `
 INTERVIEW DETAILS:
-\${problemSummary}
-Time Used: \${minutesUsed} of \${minutesTotal} minutes
-Candidate Weak Topics (known beforehand): \${weakTopics.join(', ')}
+${problemSummary}
+Time Used: ${minutesUsed} of ${minutesTotal} minutes
+Candidate Weak Topics (known beforehand): ${weakTopics.join(', ')}
 
-\${codeSummary}
+${codeSummary}
 
 FULL INTERVIEW TRANSCRIPT:
-\${transcriptText.slice(0, 6000)}
-\`;
+${transcriptText.slice(0, 6000)}
+`;
 
   let raw = await chatCompletion(FEEDBACK_SYSTEM, userPrompt, 1500);
 
   // Strip any accidental markdown fences
-  raw = raw.replace(/\`\`\`json\\n?|\`\`\`/g, '').trim();
+  raw = raw.replace(/```json\n?|```/g, '').trim();
 
   let parsed: unknown;
   try {
@@ -336,12 +322,12 @@ FULL INTERVIEW TRANSCRIPT:
   } catch {
     // Retry with stricter instruction
     const raw2 = await chatCompletion(
-      FEEDBACK_SYSTEM + '\\nCRITICAL: OUTPUT RAW JSON ONLY. ABSOLUTELY NO OTHER TEXT.',
+      FEEDBACK_SYSTEM + '\nCRITICAL: OUTPUT RAW JSON ONLY. ABSOLUTELY NO OTHER TEXT.',
       userPrompt,
       1500
     );
     try {
-      parsed = JSON.parse(raw2.replace(/\`\`\`json\\n?|\`\`\`/g, '').trim());
+      parsed = JSON.parse(raw2.replace(/```json\n?|```/g, '').trim());
     } catch {
       // Return a safe fallback structure
       parsed = {

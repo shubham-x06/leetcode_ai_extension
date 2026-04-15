@@ -8,7 +8,7 @@ interface Props {
   setUserInput: (v: string) => void;
   onSend: () => void;
   disabled: boolean;
-  chatEndRef: React.RefObject<HTMLDivElement>;
+  chatEndRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export function InterviewChat({
