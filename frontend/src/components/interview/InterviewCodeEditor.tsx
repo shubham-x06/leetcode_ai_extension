@@ -5,9 +5,11 @@ interface Props {
   onChange: (val: string) => void;
   language: string;
   disabled: boolean;
+  onSubmitCode?: () => void;
+  isSending?: boolean;
 }
 
-export function InterviewCodeEditor({ code, onChange, language, disabled }: Props) {
+export function InterviewCodeEditor({ code, onChange, language, disabled, onSubmitCode, isSending }: Props) {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Tab key inserts 4 spaces instead of moving focus
     if (e.key === 'Tab') {
@@ -42,17 +44,34 @@ export function InterviewCodeEditor({ code, onChange, language, disabled }: Prop
         <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono, monospace)' }}>
           {language} — Your solution
         </span>
-        <button
-          onClick={() => onChange('')}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 12, color: 'var(--text-muted)',
-            padding: '2px 8px', borderRadius: 'var(--radius-sm)',
-          }}
-          title="Clear editor"
-        >
-          Clear
-        </button>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <button
+            onClick={() => onChange('')}
+            disabled={disabled}
+            style={{
+              background: 'none', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+              fontSize: 12, color: 'var(--text-muted)',
+              padding: '4px 10px', borderRadius: 'var(--radius-sm)',
+            }}
+            title="Clear editor"
+          >
+            Clear
+          </button>
+          {onSubmitCode && (
+            <button
+              onClick={onSubmitCode}
+              disabled={disabled || isSending || !code.trim()}
+              style={{
+                background: 'var(--accent)', border: 'none', cursor: (disabled || isSending || !code.trim()) ? 'not-allowed' : 'pointer',
+                fontSize: 12, fontWeight: 600, color: '#fff',
+                padding: '4px 14px', borderRadius: 'var(--radius-sm)',
+                opacity: (disabled || isSending || !code.trim()) ? 0.6 : 1,
+              }}
+            >
+              {isSending ? 'Submitting...' : 'Submit Code'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Line numbers + textarea */}
@@ -76,7 +95,7 @@ export function InterviewCodeEditor({ code, onChange, language, disabled }: Prop
           onKeyDown={handleKeyDown}
           disabled={disabled}
           spellCheck={false}
-          placeholder={`# Write your solution here\n# Think out loud in the chat panel\n\ndef solution():\n    pass`}
+          placeholder={`// Write your solution here\n// Think out loud in the chat panel\n\nclass Solution {\npublic:\n    void solve() {\n        \n    }\n};`}
           style={{
             flex: 1, padding: '14px var(--space-4)',
             background: '#0A0A14', color: '#E2E8F0',

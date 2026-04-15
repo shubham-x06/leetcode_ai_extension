@@ -27,7 +27,7 @@ export default function InterviewPage() {
 
   // Interview state — passed to InterviewActive
   const [transcript, setTranscript] = useState<ChatMessage[]>([]);
-  const [codeByProblem, setCodeByProblem] = useState<string[]>(['', '']);
+  const [codeByProblem, setCodeByProblem] = useState<string[]>(['', '', '']);
   const [currentProblemIndex, setCurrentProblemIndex] = useState(0);
   const [phase, setPhase] = useState<InterviewPhase>('intro');
   const [timeRemainingSeconds, setTimeRemainingSeconds] = useState(45 * 60);
@@ -156,7 +156,7 @@ export default function InterviewPage() {
           setReport(null);
           setSession(null);
           setTranscript([]);
-          setCodeByProblem(['', '']);
+          setCodeByProblem(['', '', '']);
           setError('');
           setPageState('lobby');
         }}

@@ -101,8 +101,8 @@ export function InterviewActive({
     }
   }, [timeRemainingSeconds]);
 
-  const handleSend = useCallback(async () => {
-    const text = userInput.trim();
+  const handleSend = useCallback(async (overrideText?: string | React.MouseEvent | React.KeyboardEvent | undefined) => {
+    const text = (typeof overrideText === 'string' ? overrideText : userInput).trim();
     if (!text || isSending || phase === 'complete') return;
 
     const userMsg: ChatMessage = { role: 'user', content: text, timestamp: new Date().toISOString() };
@@ -253,8 +253,10 @@ export function InterviewActive({
             next[currentProblemIndex] = val;
             return next;
           })}
-          language="python"
+          language="c++"
           disabled={phase === 'complete'}
+          onSubmitCode={() => handleSend("I have finished writing my solution. Could you please evaluate my code?")}
+          isSending={isSending}
         />
 
         {/* Col 3: Chat with interviewer */}

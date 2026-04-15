@@ -25,18 +25,16 @@ interviewRouter.post('/start', asyncHandler(async (req, res) => {
     return topic.toLowerCase().replace(/[()]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   }
 
-  // Problem 1: from first weak topic, easier difficulty
-  // Problem 2: from second weak topic, harder difficulty (escalate)
+  // Problem 1: from first weak topic, easy difficulty
+  // Problem 2: from second weak topic, medium difficulty
+  // Problem 3: from third weak topic, hard difficulty
   const tag1 = weakTopics[0] ? resolveTag(weakTopics[0]) : 'array';
   const tag2 = weakTopics[1] ? resolveTag(weakTopics[1]) : 'dynamic-programming';
+  const tag3 = weakTopics[2] ? resolveTag(weakTopics[2]) : 'graphs';
 
-  let diff1: 'EASY' | 'MEDIUM' | 'HARD' = 'MEDIUM';
+  let diff1: 'EASY' | 'MEDIUM' | 'HARD' = 'EASY';
   let diff2: 'EASY' | 'MEDIUM' | 'HARD' = 'MEDIUM';
-
-  if (prefDifficulty === 'Easy') { diff1 = 'EASY'; diff2 = 'MEDIUM'; }
-  else if (prefDifficulty === 'Hard') { diff1 = 'MEDIUM'; diff2 = 'HARD'; }
-  else if (prefDifficulty === 'Medium') { diff1 = 'MEDIUM'; diff2 = 'MEDIUM'; }
-  else { diff1 = 'EASY'; diff2 = 'MEDIUM'; } // Mixed: escalate
+  let diff3: 'EASY' | 'MEDIUM' | 'HARD' = 'HARD';
 
   async function fetchRandomProblem(tag: string, difficulty: 'EASY' | 'MEDIUM' | 'HARD') {
     // Try asking for 100 problems of this tag across 0 skip to maximize pool without breaking bounds
@@ -61,19 +59,21 @@ interviewRouter.post('/start', asyncHandler(async (req, res) => {
     return afp[Math.floor(Math.random() * afp.length)] || null;
   }
 
-  const [p1Meta, p2Meta] = await Promise.all([
+  const [p1Meta, p2Meta, p3Meta] = await Promise.all([
     fetchRandomProblem(tag1, diff1),
     fetchRandomProblem(tag2, diff2),
+    fetchRandomProblem(tag3, diff3),
   ]);
 
-  if (!p1Meta || !p2Meta) {
+  if (!p1Meta || !p2Meta || !p3Meta) {
     throw new AppError(502, 'Could not fetch interview problems. Try again.', 'PROBLEM_FETCH_FAILED');
   }
 
   // Fetch full problem content for both
-  const [p1, p2] = await Promise.all([
+  const [p1, p2, p3] = await Promise.all([
     getProblemDetail(p1Meta.titleSlug),
     getProblemDetail(p2Meta.titleSlug),
+    getProblemDetail(p3Meta.titleSlug),
   ]);
 
   // Strip HTML from content for clean display
@@ -105,8 +105,17 @@ interviewRouter.post('/start', asyncHandler(async (req, res) => {
         topicTags: p2.topicTags,
         hints: p2.hints || [],
       },
+      {
+        questionId: p3.questionId,
+        title: p3.title,
+        titleSlug: p3.titleSlug,
+        difficulty: p3.difficulty,
+        content: stripHtml(p3.content || ''),
+        topicTags: p3.topicTags,
+        hints: p3.hints || [],
+      },
     ],
-    durationMinutes: 45,
+    durationMinutes: 60,
     startedAt: new Date().toISOString(),
     weakTopics,
   };
@@ -132,7 +141,7 @@ interviewRouter.post('/message', asyncHandler(async (req, res) => {
       topicTags: z.array(z.object({ name: z.string() })),
     }),
     userCode: z.string().default(''),
-    problemIndex: z.number().int().min(0).max(1),
+    problemIndex: z.number().int().min(0).max(2),
     timeRemainingSeconds: z.number().int().min(0),
     phase: z.enum(['intro', 'solving', 'followup', 'transition', 'complete']),
   });
@@ -154,7 +163,7 @@ interviewRouter.post('/message', asyncHandler(async (req, res) => {
 
   const INTERVIEWER_SYSTEM = `You are a senior FAANG software engineer conducting a real technical interview.
 
-CURRENT PROBLEM (Problem ${problemIndex + 1} of 2):
+CURRENT PROBLEM (Problem ${problemIndex + 1} of 3):
 Title: ${currentProblem.title}
 Difficulty: ${currentProblem.difficulty}
 Topics: ${tags}
@@ -178,7 +187,7 @@ YOUR BEHAVIOR RULES — FOLLOW STRICTLY:
 8. If candidate writes optimal solution: ask them to walk through it or consider edge cases.
 9. If time < 5 minutes: gently mention time and ask to finalize.
 10. If phase=followup: ask deeper questions (complexity, edge cases, alternative approaches, real-world use cases).
-11. If phase=transition: congratulate briefly on finishing problem 1, introduce problem 2 naturally.
+11. If phase=transition: congratulate briefly on finishing the problem, introduce the next problem naturally.
 12. Vary your questions. Do not repeat the same question twice in one interview.
 13. Never break character. Never say you are an AI.
 
@@ -233,8 +242,8 @@ interviewRouter.post('/feedback', asyncHandler(async (req, res) => {
       title: z.string(),
       difficulty: z.string(),
       topicTags: z.array(z.object({ name: z.string() })),
-    })).min(1).max(2),
-    finalCode: z.array(z.string()).min(1).max(2),
+    })).min(1).max(3),
+    finalCode: z.array(z.string()).min(1).max(3),
     durationUsedSeconds: z.number().int().min(0),
     totalDurationSeconds: z.number().int().min(1),
     weakTopics: z.array(z.string()).default([]),

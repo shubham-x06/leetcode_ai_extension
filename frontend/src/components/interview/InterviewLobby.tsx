@@ -37,7 +37,7 @@ export function InterviewLobby({ onStart, isLoading, error }: Props) {
           </span>
         </h1>
         <p className="body-lg" style={{ color: 'var(--text-secondary)', maxWidth: 480, margin: '0 auto' }}>
-          A real 45-minute FAANG-style technical interview. Two DSA problems.
+          A real 60-minute FAANG-style technical interview. Three DSA problems.
           AI interviewer. Live feedback. No shortcuts.
         </p>
       </div>
@@ -47,8 +47,8 @@ export function InterviewLobby({ onStart, isLoading, error }: Props) {
         <h3 className="h3" style={{ marginBottom: 'var(--space-6)' }}>What to expect</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-5)' }}>
           {[
-            { icon: '⏱', title: '45 Minutes', desc: 'Real interview time pressure. Timer counts down from the first problem.' },
-            { icon: '💻', title: '2 DSA Problems', desc: 'Tailored to your weak topics. Problem 1 is warm-up, Problem 2 is harder.' },
+            { icon: '⏱', title: '60 Minutes', desc: 'Real interview time pressure. Timer counts down from the first problem.' },
+            { icon: '💻', title: '3 DSA Problems', desc: 'Tailored to your weak topics. Easy, Medium, and Hard difficulty.' },
             { icon: '🧑💼', title: 'AI Interviewer', desc: 'Asks follow-ups, challenges your thinking, evaluates your communication.' },
             { icon: '📊', title: 'Detailed Report', desc: 'Scored across 6 dimensions with specific actionable feedback.' },
           ].map(item => (

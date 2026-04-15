@@ -92,7 +92,7 @@ export function InterviewReport({ report, problems, onStartNew }: Props) {
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {Object.entries(report.scores).map(([key, val]) => (
+          {Object.entries(report.scores || {}).map(([key, val]) => (
             <div key={key}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                 <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
@@ -115,7 +115,7 @@ export function InterviewReport({ report, problems, onStartNew }: Props) {
             ✓ Strengths
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            {report.strengths.map((s, i) => (
+            {(report.strengths || []).map((s, i) => (
               <div key={i} style={{
                 display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start',
                 padding: 'var(--space-3)', background: 'var(--success-subtle)',
@@ -133,7 +133,7 @@ export function InterviewReport({ report, problems, onStartNew }: Props) {
             ↑ Areas to Improve
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            {report.improvements.map((s, i) => (
+            {(report.improvements || []).map((s, i) => (
               <div key={i} style={{
                 display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start',
                 padding: 'var(--space-3)', background: 'var(--error-subtle)',
@@ -148,7 +148,7 @@ export function InterviewReport({ report, problems, onStartNew }: Props) {
       </div>
 
       {/* Per-problem feedback */}
-      {report.problemFeedback.map((pf, i) => (
+      {(report.problemFeedback || []).map((pf, i) => (
         <Card key={i}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
             <h3 className="h3">Problem {i + 1}: {pf.problemTitle}</h3>
@@ -174,7 +174,7 @@ export function InterviewReport({ report, problems, onStartNew }: Props) {
               </div>
             ))}
           </div>
-          {pf.missedEdgeCases.length > 0 && (
+          {pf.missedEdgeCases && pf.missedEdgeCases.length > 0 && (
             <div style={{ marginTop: 'var(--space-5)' }}>
               <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Missed Edge Cases
@@ -197,7 +197,7 @@ export function InterviewReport({ report, problems, onStartNew }: Props) {
       <Card>
         <h3 className="h3" style={{ marginBottom: 'var(--space-5)' }}>Study Recommendations</h3>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
-          {report.recommendedTopics.map((t, i) => (
+          {(report.recommendedTopics || []).map((t, i) => (
             <span key={i} style={{
               fontSize: 13, padding: '6px 14px', borderRadius: 'var(--radius-full)',
               background: 'var(--accent-subtle)', color: 'var(--accent)',
