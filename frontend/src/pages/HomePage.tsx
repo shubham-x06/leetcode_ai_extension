@@ -84,7 +84,7 @@ export default function HomePage() {
           {/* SECTION 5: Weak Topics */}
           <WeakTopicsBadges 
             delay={250} 
-            topics={(user as any)?.cachedWeakTopics || ['Dynamic Programming', 'Graphs', 'Trie']} 
+            topics={stats?.weakTopics || ((user as any)?.cachedWeakTopics || ['Dynamic Programming', 'Graphs', 'Trie'])} 
           />
       </div>
 

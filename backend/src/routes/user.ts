@@ -13,7 +13,7 @@ import {
   LeetCodeError,
 } from '../services/leetcodeGraphql';
 import { computeStreaks } from '../lib/computeStreaks';
-import { computeWeakTopics } from '../lib/computeWeakTopics';
+import { computeWeakTopics, computeWeakTopicNames } from '../lib/computeWeakTopics';
 
 const router = Router();
 
@@ -44,11 +44,12 @@ router.get('/stats', asyncHandler(async (req: Request, res: Response) => {
     getUserProgress(username),
   ]);
 
-  // Update cachedWeakTopics asynchronously — do not await
+  // Compute rich weak topics (with real solveRate) for response
   const weakTopics = computeWeakTopics(skills);
-  User.findByIdAndUpdate(req.userId, { cachedWeakTopics: weakTopics }).catch(() => {});
+  // Cache only names in DB for backward compat — fire-and-forget
+  User.findByIdAndUpdate(req.userId, { cachedWeakTopics: computeWeakTopicNames(skills) }).catch(() => {});
 
-  return res.json({ profile, solved, skills, languages, progress });
+  return res.json({ profile, solved, skills, languages, progress, weakTopics });
 }));
 
 // GET /api/user/calendar

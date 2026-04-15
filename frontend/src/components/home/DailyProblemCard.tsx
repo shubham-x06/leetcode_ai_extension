@@ -21,7 +21,7 @@ export function DailyProblemCard({ problem, motivation, delay = 0 }: DailyProble
   const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   return (
-    <Card variant="accent" delay={delay} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Card variant="accent" delay={delay} style={{ display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
         <p className="label">Today's Challenge · {dateStr}</p>
         <Badge variant={problem.difficulty as any}>{problem.difficulty}</Badge>
@@ -40,13 +40,12 @@ export function DailyProblemCard({ problem, motivation, delay = 0 }: DailyProble
       </div>
 
       <div style={{ 
-        flex: 1,
         fontStyle: 'italic',
-        fontSize: '14px',
+        fontSize: '13px',
         color: 'var(--text-secondary)',
         paddingLeft: 'var(--space-4)',
         borderLeft: '2px solid var(--accent)',
-        marginBottom: 'var(--space-8)',
+        marginBottom: 'var(--space-6)',
         lineHeight: 1.5
       }}>
         {motivation || "This problem will test your pattern recognition. Focus on the constraints first."}
