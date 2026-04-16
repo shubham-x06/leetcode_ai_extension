@@ -273,8 +273,10 @@ interviewRouter.post('/feedback', asyncHandler(async (req, res) => {
     `Problem ${i + 1} Final Code:\n${c.slice(0, 1500) || '(no code submitted)'}`
   ).join('\n\n');
 
-  const FEEDBACK_SYSTEM = `You are a senior FAANG hiring manager evaluating a technical interview.
-Analyze the interview transcript and code, then generate a structured JSON performance report.
+  const FEEDBACK_SYSTEM = `You are a strict, senior FAANG hiring manager evaluating a technical interview.
+Analyze the interview transcript and code carefully. Your scoring and assessment MUST be brutally honest, objective, and perfectly aligned with the candidate's actual performance.
+- If the candidate wrote little to no code, or the code does not work, scores MUST be low (1-4).
+- Do not hallucinate strengths or edge cases if none exist. Be precise based on the transcript ONLY.
 
 RESPOND WITH VALID JSON ONLY. No markdown. No backticks. No explanation outside the JSON.
 
@@ -344,14 +346,14 @@ ${transcriptText.slice(0, 6000)}
         overallScore: 6,
         summary: 'Interview completed. Full analysis unavailable — please try again.',
         scores: {
-          problemSolving: { score: 6, comment: 'Attempted both problems.' },
+          problemSolving: { score: 6, comment: 'Attempted the problems.' },
           codeQuality: { score: 6, comment: 'Code was submitted.' },
           optimization: { score: 5, comment: 'Analysis unavailable.' },
           communication: { score: 6, comment: 'Candidate communicated their approach.' },
           edgeCases: { score: 5, comment: 'Analysis unavailable.' },
           timeManagement: { score: minutesUsed <= minutesTotal ? 7 : 4, comment: minutesUsed <= minutesTotal ? 'Completed within time.' : 'Ran out of time.' },
         },
-        strengths: ['Attempted both problems', 'Communicated approach'],
+        strengths: [`Attempted ${problems.length} problems`, 'Communicated approach'],
         improvements: ['Practice more problems in weak topics', 'Focus on optimization', 'Consider edge cases'],
         problemFeedback: problems.map((p) => ({
           problemTitle: p.title,

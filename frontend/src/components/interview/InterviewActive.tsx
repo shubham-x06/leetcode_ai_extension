@@ -70,7 +70,7 @@ export function InterviewActive({
       } catch {
         const fallback: ChatMessage = {
           role: 'assistant',
-          content: `Welcome to your technical interview. I'm going to give you ${session.durationMinutes} minutes to solve two problems. Let's start with Problem 1: ${currentProblem.title}. Please read it carefully and tell me your initial thoughts on the approach.`,
+          content: `Welcome to your technical interview. I'm going to give you ${session.durationMinutes} minutes to solve ${session.problems.length} problems. Let's start with Problem 1: ${currentProblem.title}. Please read it carefully and tell me your initial thoughts on the approach.`,
           timestamp: new Date().toISOString(),
         };
         setTranscript([fallback]);
@@ -141,26 +141,27 @@ export function InterviewActive({
   }, [userInput, isSending, phase, transcript, currentProblem, codeByProblem, currentProblemIndex, timeRemainingSeconds]);
 
   const handleNextProblem = useCallback(async () => {
-    if (currentProblemIndex >= session.problems.length - 1) return;
+    const nextIndex = currentProblemIndex + 1;
+    if (nextIndex >= session.problems.length) return;
     const transitionMsg: ChatMessage = {
       role: 'user',
-      content: `I'm done with problem 1 and ready to move to problem 2.`,
+      content: `I'm done with problem ${currentProblemIndex + 1} and ready to move to problem ${nextIndex + 1}.`,
       timestamp: new Date().toISOString(),
     };
     const newTranscript = [...transcript, transitionMsg];
     setTranscript(newTranscript);
-    setCurrentProblemIndex(1);
+    setCurrentProblemIndex(nextIndex);
     setPhase('solving');
     setActiveTab('problem');
 
     setIsAiTyping(true);
     try {
-      const nextProblem = session.problems[1];
+      const nextProblem = session.problems[nextIndex];
       const { reply } = await sendMessage({
         messages: newTranscript.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
         currentProblem: nextProblem,
         userCode: '',
-        problemIndex: 1,
+        problemIndex: nextIndex,
         timeRemainingSeconds,
         phase: 'transition',
       });
@@ -169,7 +170,7 @@ export function InterviewActive({
     } catch {
       const fallback: ChatMessage = {
         role: 'assistant',
-        content: `Great work on Problem 1. Let's move to Problem 2: ${session.problems[1].title}. Take a moment to read it and share your initial approach.`,
+        content: `Great work on Problem ${currentProblemIndex + 1}. Let's move to Problem ${nextIndex + 1}: ${session.problems[nextIndex].title}. Take a moment to read it and share your initial approach.`,
         timestamp: new Date().toISOString(),
       };
       setTranscript(prev => [...prev, fallback]);
@@ -211,7 +212,7 @@ export function InterviewActive({
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           <InterviewTimer seconds={timeRemainingSeconds} />
-          {!isLastProblem && currentProblemIndex === 0 && (
+          {!isLastProblem && (
             <button
               onClick={handleNextProblem}
               style={{
