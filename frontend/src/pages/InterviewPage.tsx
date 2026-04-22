@@ -30,9 +30,17 @@ export default function InterviewPage() {
   const [codeByProblem, setCodeByProblem] = useState<string[]>(['', '', '']);
   const [currentProblemIndex, setCurrentProblemIndex] = useState(0);
   const [phase, setPhase] = useState<InterviewPhase>('intro');
-  const [timeRemainingSeconds, setTimeRemainingSeconds] = useState(45 * 60);
+  const [timeRemainingSeconds, setTimeRemainingSeconds] = useState(60 * 60);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionStartRef = useRef<number>(0);
+
+  useEffect(() => {
+    console.log('[InterviewPage] mounted, pageState:', pageState);
+  }, []);
+
+  useEffect(() => {
+    console.log('[InterviewPage] pageState changed to:', pageState, 'session:', !!session);
+  }, [pageState, session]);
 
   const handleStart = async () => {
     setError('');
@@ -81,7 +89,7 @@ export default function InterviewPage() {
     if (timerRef.current) clearInterval(timerRef.current);
     setPageState('loading-report');
     const usedSeconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
-    const totalSeconds = (session?.durationMinutes || 45) * 60;
+    const totalSeconds = (session?.durationMinutes || 60) * 60;
     try {
       const fb = await generateFeedback({
         transcript: finalTranscript,

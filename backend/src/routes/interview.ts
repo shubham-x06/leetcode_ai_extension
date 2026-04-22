@@ -6,6 +6,7 @@ import { User } from '../models/User';
 import { chatCompletion } from '../services/groq';
 import { getProblemList, getProblemDetail } from '../services/leetcodeGraphql';
 import OpenAI from 'openai';
+import { resilientInterviewChat, resilientFeedbackChat } from '../services/aiAgents';
 
 export const interviewRouter = Router();
 
@@ -85,6 +86,33 @@ interviewRouter.post('/start', asyncHandler(async (req, res) => {
       .replace(/\s{2,}/g, ' ').trim();
   }
 
+  function extractSampleTestCases(content: string): { input: string; expected: string }[] {
+    const cases: { input: string; expected: string }[] = [];
+    const inputPattern = /Input:\s*([^\n]+(?:\n(?!Output:)[^\n]+)*)/gi;
+    const outputPattern = /Output:\s*([^\n]+)/gi;
+
+    const inputs: string[] = [];
+    const outputs: string[] = [];
+
+    let match;
+    while ((match = inputPattern.exec(content)) !== null) {
+      inputs.push(match[1].trim());
+    }
+    while ((match = outputPattern.exec(content)) !== null) {
+      outputs.push(match[1].trim());
+    }
+
+    for (let i = 0; i < Math.min(inputs.length, outputs.length, 3); i++) {
+      cases.push({ input: inputs[i], expected: outputs[i] });
+    }
+
+    if (cases.length === 0) {
+      cases.push({ input: 'Example input', expected: 'Example output' });
+    }
+
+    return cases;
+  }
+
   const session = {
     problems: [
       {
@@ -95,6 +123,7 @@ interviewRouter.post('/start', asyncHandler(async (req, res) => {
         content: stripHtml(p1.content || ''),
         topicTags: p1.topicTags,
         hints: p1.hints || [],
+        sampleTestCases: extractSampleTestCases(p1.content || ''),
       },
       {
         questionId: p2.questionId,
@@ -104,6 +133,7 @@ interviewRouter.post('/start', asyncHandler(async (req, res) => {
         content: stripHtml(p2.content || ''),
         topicTags: p2.topicTags,
         hints: p2.hints || [],
+        sampleTestCases: extractSampleTestCases(p2.content || ''),
       },
       {
         questionId: p3.questionId,
@@ -113,6 +143,7 @@ interviewRouter.post('/start', asyncHandler(async (req, res) => {
         content: stripHtml(p3.content || ''),
         topicTags: p3.topicTags,
         hints: p3.hints || [],
+        sampleTestCases: extractSampleTestCases(p3.content || ''),
       },
     ],
     durationMinutes: 60,
@@ -209,20 +240,7 @@ QUESTION BANK (rotate through these based on context):
     ...messages.slice(-12), // keep last 12 messages to manage token budget
   ];
 
-  // Call OpenAI API directly pointing to Groq
-  const openai = new OpenAI({
-    apiKey: process.env.GROQ_API_KEY,
-    baseURL: 'https://api.groq.com/openai/v1',
-  });
-
-  const completion = await openai.chat.completions.create({
-    model: 'llama-3.1-8b-instant',
-    messages: groqMessages,
-    max_tokens: 200,
-    temperature: 0.7,
-  });
-
-  const reply = completion.choices[0]?.message?.content || 'Please continue with your solution.';
+  const reply = await resilientInterviewChat(groqMessages);
   res.json({ reply });
 }));
 
@@ -322,7 +340,10 @@ FULL INTERVIEW TRANSCRIPT:
 ${transcriptText.slice(0, 6000)}
 `;
 
-  let raw = await chatCompletion(FEEDBACK_SYSTEM, userPrompt, 1500);
+  let raw = await resilientFeedbackChat([
+    { role: 'system', content: FEEDBACK_SYSTEM },
+    { role: 'user', content: userPrompt }
+  ]);
 
   // Strip any accidental markdown fences
   raw = raw.replace(/```json\n?|```/g, '').trim();
@@ -332,11 +353,10 @@ ${transcriptText.slice(0, 6000)}
     parsed = JSON.parse(raw);
   } catch {
     // Retry with stricter instruction
-    const raw2 = await chatCompletion(
-      FEEDBACK_SYSTEM + '\nCRITICAL: OUTPUT RAW JSON ONLY. ABSOLUTELY NO OTHER TEXT.',
-      userPrompt,
-      1500
-    );
+    const raw2 = await resilientFeedbackChat([
+      { role: 'system', content: FEEDBACK_SYSTEM + '\nCRITICAL: OUTPUT RAW JSON ONLY. ABSOLUTELY NO OTHER TEXT.' },
+      { role: 'user', content: userPrompt }
+    ]);
     try {
       parsed = JSON.parse(raw2.replace(/```json\n?|```/g, '').trim());
     } catch {

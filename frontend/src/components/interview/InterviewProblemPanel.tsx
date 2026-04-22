@@ -30,12 +30,16 @@ export function InterviewProblemPanel({ problem }: { problem: InterviewProblem }
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-5)' }}>
-        <p style={{
-          fontSize: 14, lineHeight: 1.75, color: 'var(--text-secondary)',
-          whiteSpace: 'pre-wrap', fontFamily: 'var(--font-sans)',
-        }}>
-          {problem.content}
-        </p>
+        <div style={{ fontSize: 14, lineHeight: 1.75, color: 'var(--text-secondary)' }}>
+          {problem.content.split('\n').map((line, i) => (
+            <p key={i} style={{
+              marginBottom: line.trim() === '' ? 'var(--space-3)' : 'var(--space-1)',
+              minHeight: line.trim() === '' ? 8 : 'auto',
+            }}>
+              {line || '\u00A0'}
+            </p>
+          ))}
+        </div>
 
         {problem.hints && problem.hints.length > 0 && (
           <div style={{ marginTop: 'var(--space-6)' }}>

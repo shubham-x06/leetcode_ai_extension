@@ -8,6 +8,25 @@ export interface InterviewProblem {
   content: string;
   topicTags: { name: string; slug?: string }[];
   hints: string[];
+  sampleTestCases: { input: string; expected: string }[];
+}
+
+export interface TestCaseResult {
+  testCase: number;
+  input: string;
+  expected: string;
+  actual: string;
+  passed: boolean;
+  executionTime: string;
+  error: string | null;
+}
+
+export interface RunResult {
+  results: TestCaseResult[];
+  allPassed: boolean;
+  summary: string;
+  timeComplexity: string;
+  spaceComplexity: string;
 }
 
 export interface InterviewSession {
@@ -78,5 +97,19 @@ export async function generateFeedback(payload: {
   weakTopics: string[];
 }): Promise<FeedbackReport> {
   const { data } = await apiClient.post('/interview/feedback', payload);
+  return data;
+}
+
+export async function runCode(payload: {
+  code: string;
+  language: string;
+  problem: {
+    title: string;
+    content: string;
+    topicTags: { name: string }[];
+  };
+  testCases: { input: string; expected: string }[];
+}): Promise<RunResult> {
+  const { data } = await apiClient.post('/code/run', payload);
   return data;
 }

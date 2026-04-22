@@ -13,6 +13,7 @@ import { userRouter } from './routes/user';
 import { problemsRouter } from './routes/problems';
 import { aiRouter } from './routes/ai';
 import { interviewRouter } from './routes/interview';
+import { codeRunnerRouter } from './routes/codeRunner';
 
 dotenv.config();
 
@@ -63,19 +64,19 @@ app.use('/api/auth', requireAuth, protectedAuthRouter);
 
 app.use('/api/user', requireAuth, userRouter);
 app.use('/api/problems', requireAuth, problemsRouter);
+app.use('/api/code', requireAuth, codeRunnerRouter);
 
 app.use('/api/ai', requireAuth, aiRateLimiter, aiRouter);
 
 const interviewRateLimiter = rateLimit({
-  windowMs: 10 * 60_000,
-  max: 5,
-  keyGenerator: (req) =>
-    `interview-${(req as any).userId || req.ip}`,
-  handler: (_req, res) =>
-    res.status(429).json({
-      error: 'Too many interview sessions. Wait 10 minutes.',
-      retryAfter: 600,
-    }),
+  windowMs: 60 * 60_000,   // 1 hour
+  max: 30,                  // 30 per hour — very generous
+  keyGenerator: (req) => `interview-${(req as any).userId || req.ip}`,
+  handler: (_req, res) => res.status(429).json({
+    error: 'Too many interviews started. Please wait before starting another session.',
+    retryAfter: 3600,
+  }),
+  skip: () => process.env.NODE_ENV === 'development', // no limit in dev
 });
 
 app.use(
