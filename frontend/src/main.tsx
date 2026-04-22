@@ -8,9 +8,16 @@ import { useAuthStore } from './store/useAuthStore';
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 async function bootstrap() {
-  // Rehydrate auth from storage before first render
-  // This prevents the flash-to-login on page reload
-  await useAuthStore.getState().rehydrate();
+  try {
+    // Race rehydration against a 3s timeout to prevent infinite loading on Vercel cold starts
+    await Promise.race([
+      useAuthStore.getState().rehydrate(),
+      new Promise(resolve => setTimeout(resolve, 3000)),
+    ]);
+  } catch {
+    // Rehydration failed — proceed with empty state
+    useAuthStore.setState({ _rehydrated: true });
+  }
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

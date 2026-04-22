@@ -17,10 +17,13 @@ export default function LoginPage() {
       setIsLoading(true);
       setError('');
       const data = await loginWithGoogle(response.credential);
+      // Write to store first
       login(data.token, data.user);
+      // Give storage writes 50ms to settle before navigation triggers rehydration check
+      await new Promise(resolve => setTimeout(resolve, 50));
       navigate(data.needsLeetCodeLink ? '/onboard' : '/');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      setError(err.response?.data?.error || err.response?.data?.message || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
     }

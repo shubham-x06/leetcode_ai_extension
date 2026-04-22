@@ -23,7 +23,11 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (
+      error.response?.status === 401 &&
+      !error.config?.url?.includes('/auth/google') &&
+      !error.config?.url?.includes('/auth/link-leetcode')
+    ) {
       useAuthStore.getState().logout();
       window.location.hash = '#/login';
     }

@@ -42,25 +42,41 @@ function writeToStorage(key: string, value: string | null): void {
 }
 
 async function readFromChromeStorage(key: string): Promise<string | null> {
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    return new Promise((resolve) => {
-      chrome.storage.local.get([key], (result) => {
-        resolve((result[key] as string) ?? null);
+  try {
+    if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
+      return new Promise((resolve) => {
+        try {
+          chrome.storage.local.get([key], (result) => {
+            resolve((result[key] as string) ?? null);
+          });
+        } catch {
+          resolve(null);
+        }
       });
-    });
+    }
+  } catch {
+    // chrome is not available (Vercel / web context)
   }
   return null;
 }
 
 async function writeToChromeStorage(key: string, value: string | null): Promise<void> {
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    return new Promise((resolve) => {
-      if (value === null) {
-        chrome.storage.local.remove(key, () => resolve());
-      } else {
-        chrome.storage.local.set({ [key]: value }, () => resolve());
-      }
-    });
+  try {
+    if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
+      return new Promise((resolve) => {
+        try {
+          if (value === null) {
+            chrome.storage.local.remove(key, () => resolve());
+          } else {
+            chrome.storage.local.set({ [key]: value }, () => resolve());
+          }
+        } catch {
+          resolve();
+        }
+      });
+    }
+  } catch {
+    // chrome is not available (Vercel / web context)
   }
 }
 
@@ -70,30 +86,41 @@ export const useAuthStore = create<AuthState>((set) => ({
   _rehydrated: false,
 
   rehydrate: async () => {
-    // Try chrome.storage first (extension context), fall back to localStorage
-    let token = await readFromChromeStorage(STORAGE_KEY_TOKEN);
-    let userRaw = await readFromChromeStorage(STORAGE_KEY_USER);
+    try {
+      // Try chrome.storage first (extension context), fall back to localStorage
+      let token = await readFromChromeStorage(STORAGE_KEY_TOKEN);
+      let userRaw = await readFromChromeStorage(STORAGE_KEY_USER);
 
-    if (!token) token = readFromStorage(STORAGE_KEY_TOKEN);
-    if (!userRaw) userRaw = readFromStorage(STORAGE_KEY_USER);
+      // Vercel / web context: always fall back to localStorage
+      if (!token) token = readFromStorage(STORAGE_KEY_TOKEN);
+      if (!userRaw) userRaw = readFromStorage(STORAGE_KEY_USER);
 
-    let user: User | null = null;
-    if (userRaw) {
-      try {
-        user = JSON.parse(userRaw) as User;
-      } catch {
-        user = null;
+      // Validate token is not the removed mock token
+      if (token === 'mock-jwt-token-123') {
+        token = null;
       }
-    }
 
-    if (token && !user) {
-      // Corrupt state or migration from old version. Force re-login.
-      token = null;
-      writeToStorage(STORAGE_KEY_TOKEN, null);
-      writeToChromeStorage(STORAGE_KEY_TOKEN, null);
-    }
+      let user: User | null = null;
+      if (userRaw) {
+        try {
+          user = JSON.parse(userRaw) as User;
+        } catch {
+          user = null;
+        }
+      }
 
-    set({ token: token ?? null, user, _rehydrated: true });
+      if (token && !user) {
+        // Corrupt state or migration from old version. Force re-login.
+        token = null;
+        writeToStorage(STORAGE_KEY_TOKEN, null);
+        writeToChromeStorage(STORAGE_KEY_TOKEN, null);
+      }
+
+      set({ token: token ?? null, user, _rehydrated: true });
+    } catch {
+      // Rehydration failed — proceed with empty state
+      set({ token: null, user: null, _rehydrated: true });
+    }
   },
 
   login: (token, user) => {
