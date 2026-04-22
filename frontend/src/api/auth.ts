@@ -9,3 +9,8 @@ export async function linkLeetCode(leetcodeUsername: string): Promise<{ success:
   const res = await apiClient.post('/auth/link-leetcode', { leetcodeUsername });
   return res.data;
 }
+
+export async function unlinkLeetCode(): Promise<{ success: boolean }> {
+  const { data } = await apiClient.post('/auth/unlink-leetcode');
+  return data;
+}

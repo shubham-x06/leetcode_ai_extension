@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { getMe, updatePreferences } from '../api/user';
+import { unlinkLeetCode } from '../api/auth';
+import { toast } from 'sonner';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ThemeToggle } from '../components/ui/ThemeToggle';
@@ -69,6 +71,30 @@ export default function SettingsPage() {
       targetDifficulty: difficulty,
       dailyGoalCount: dailyGoal,
     });
+  };
+
+  const handleUnlink = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to unlink your LeetCode account?\n\n' +
+      'This will remove your username and cached topic data. ' +
+      'You will need to re-link to use personalized features.'
+    );
+    if (!confirmed) return;
+
+    try {
+      await unlinkLeetCode();
+      // Update local auth store so app reflects the change immediately
+      useAuthStore.getState().updateUser({ leetcodeUsername: null });
+      // Invalidate all queries that depend on LeetCode data
+      queryClient.invalidateQueries();
+      toast.success('LeetCode account unlinked successfully');
+      // Redirect to onboarding so user can re-link
+      setTimeout(() => {
+        window.location.hash = '#/onboard';
+      }, 1500);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to unlink. Please try again.');
+    }
   };
 
   if (isLoading) {
@@ -200,7 +226,7 @@ export default function SettingsPage() {
                 These actions are irreversible. Please proceed with caution.
               </p>
               <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
-                <Button variant="ghost" style={{ border: '1px solid var(--error)', color: 'var(--error)' }}>
+                <Button variant="ghost" onClick={handleUnlink} style={{ border: '1px solid var(--error)', color: 'var(--error)' }}>
                   Unlink LeetCode
                 </Button>
                 <Button variant="ghost" onClick={logout} style={{ color: 'var(--text-muted)' }}>

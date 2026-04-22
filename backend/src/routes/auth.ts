@@ -100,3 +100,17 @@ protectedAuthRouter.post(
     res.json({ success: true, leetcodeUsername });
   })
 );
+
+protectedAuthRouter.post(
+  '/unlink-leetcode',
+  asyncHandler(async (req, res) => {
+    const user = await User.findById(req.userId);
+    if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
+
+    user.leetcodeUsername = null;
+    user.cachedWeakTopics = [];
+    await user.save();
+
+    res.json({ success: true, message: 'LeetCode account unlinked successfully' });
+  })
+);
