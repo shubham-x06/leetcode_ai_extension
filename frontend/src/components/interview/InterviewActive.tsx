@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { sendMessage, runCode } from '../../api/interview';
 import type { InterviewSession, InterviewProblem, ChatMessage, InterviewPhase, RunResult } from '../../api/interview';
 import { InterviewTimer } from './InterviewTimer';
@@ -30,7 +31,8 @@ export function InterviewActive({
   const [isSending, setIsSending] = useState(false);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
-  const [activeLeftTab, setActiveLeftTab] = useState<'problem' | 'results'>('problem');
+  const [activeLeftTab, setActiveLeftTab] = useState<'problem' | 'chat'>('problem');
+  const [activeBottomTab, setActiveBottomTab] = useState<'testcases' | 'output' | 'results'>('testcases');
   const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,8 +90,10 @@ export function InterviewActive({
 
   // Auto-scroll chat
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [transcript, isAiTyping]);
+    if (activeLeftTab === 'chat') {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [transcript, isAiTyping, activeLeftTab]);
 
   // Handle time up
   useEffect(() => {
@@ -100,10 +104,11 @@ export function InterviewActive({
         content: "Time's up! That concludes our interview. Click 'Get Report' to see your detailed performance analysis.",
         timestamp: new Date().toISOString(),
       }]);
+      setActiveLeftTab('chat');
     }
   }, [timeRemainingSeconds]);
 
-  // Send chat message with smart retry
+  // Send chat message
   const handleSend = useCallback(async (overrideText?: string) => {
     const text = (overrideText || userInput).trim();
     if (!text || isSending || phase === 'complete') return;
@@ -118,6 +123,7 @@ export function InterviewActive({
     setUserInput('');
     setIsSending(true);
     setIsAiTyping(true);
+    setActiveLeftTab('chat');
 
     let retries = 0;
     const maxRetries = 2;
@@ -172,6 +178,7 @@ export function InterviewActive({
   const handleRun = useCallback(async () => {
     const code = codeByProblem[currentProblemIndex];
     if (!code.trim()) {
+      setActiveLeftTab('chat');
       setTranscript(prev => [...prev, {
         role: 'assistant',
         content: 'Write some code first before running it against the test cases.',
@@ -181,13 +188,13 @@ export function InterviewActive({
     }
 
     setIsRunning(true);
-    setActiveLeftTab('results');
+    setActiveBottomTab('results');
     setRunResult(null);
 
     try {
       const result = await runCode({
         code,
-        language: 'auto',
+        language: 'cpp', // To be dynamic later, default cpp for now based on AlgoMaster styling
         problem: {
           title: currentProblem.title,
           content: currentProblem.content,
@@ -205,8 +212,8 @@ export function InterviewActive({
 
       setTimeout(() => {
         const statusMsg = result.allPassed
-          ? `I ran my code against the test cases and all ${total}/${total} passed. Time complexity: ${result.timeComplexity}, Space: ${result.spaceComplexity}.`
-          : `I ran my code against the test cases and ${passCount}/${total} passed. I need to debug the failing cases.`;
+          ? \`I ran my code against the test cases and all \${total}/\${total} passed. Time complexity: \${result.timeComplexity}, Space: \${result.spaceComplexity}.\`
+          : \`I ran my code against the test cases and \${passCount}/\${total} passed. I need to debug the failing cases.\`;
         handleSend(statusMsg);
       }, 500);
 
@@ -221,12 +228,13 @@ export function InterviewActive({
     } finally {
       setIsRunning(false);
     }
-  }, [codeByProblem, currentProblemIndex, currentProblem]);
+  }, [codeByProblem, currentProblemIndex, currentProblem, handleSend]);
 
   // Submit code and move to next problem
   const handleSubmit = useCallback(async () => {
     const code = codeByProblem[currentProblemIndex];
     if (!code.trim()) {
+      setActiveLeftTab('chat');
       setTranscript(prev => [...prev, {
         role: 'assistant',
         content: "Please write a solution before submitting. Even a partial solution is better than nothing.",
@@ -241,7 +249,7 @@ export function InterviewActive({
 
     const submitMsg: ChatMessage = {
       role: 'user',
-      content: `I'm submitting my solution for Problem ${currentProblemIndex + 1}. Final code:\n\n${code.slice(0, 800)}`,
+      content: \`I'm submitting my solution for Problem \${currentProblemIndex + 1}. Final code:\\n\\n\${code.slice(0, 800)}\`,
       timestamp: new Date().toISOString(),
     };
     const newTranscript = [...transcript, submitMsg];
@@ -252,6 +260,7 @@ export function InterviewActive({
     try {
       if (isLastProblem) {
         setIsAiTyping(true);
+        setActiveLeftTab('chat');
         const { reply } = await sendMessage({
           messages: buildApiMessages(newTranscript),
           currentProblem,
@@ -268,27 +277,12 @@ export function InterviewActive({
         setIsAiTyping(false);
         setPhase('complete');
       } else {
-        setIsAiTyping(true);
-        const nextProblem = session.problems[currentProblemIndex + 1];
-        const { reply } = await sendMessage({
-          messages: buildApiMessages(newTranscript),
-          currentProblem: nextProblem,
-          userCode: '',
-          problemIndex: currentProblemIndex + 1,
-          timeRemainingSeconds,
-          phase: 'transition',
-        });
-
+        // NEXT PROBLEM
         setCurrentProblemIndex(prev => prev + 1);
         setRunResult(null);
         setActiveLeftTab('problem');
+        setActiveBottomTab('testcases');
         setPhase('solving');
-        setTranscript(prev => [...prev, {
-          role: 'assistant',
-          content: reply,
-          timestamp: new Date().toISOString(),
-        }]);
-        setIsAiTyping(false);
       }
     } catch {
       setIsAiTyping(false);
@@ -298,106 +292,60 @@ export function InterviewActive({
         setCurrentProblemIndex(prev => prev + 1);
         setRunResult(null);
         setActiveLeftTab('problem');
+        setActiveBottomTab('testcases');
         setPhase('solving');
-        setTranscript(prev => [...prev, {
-          role: 'assistant',
-          content: `Good effort on Problem ${currentProblemIndex + 1}. Let's move to Problem ${currentProblemIndex + 2}: "${session.problems[currentProblemIndex + 1]?.title}". Take a moment to read it carefully.`,
-          timestamp: new Date().toISOString(),
-        }]);
       }
     } finally {
       setIsSubmitting(false);
     }
-  }, [codeByProblem, currentProblemIndex, totalProblems, transcript, currentProblem, session, timeRemainingSeconds, submittedProblems]);
+  }, [codeByProblem, currentProblemIndex, totalProblems, transcript, currentProblem, session, timeRemainingSeconds, submittedProblems, buildApiMessages, setPhase, setCurrentProblemIndex, setTranscript]);
 
-  const isLastProblem = currentProblemIndex >= totalProblems - 1;
-  const currentCode = codeByProblem[currentProblemIndex];
   const isCurrentSubmitted = submittedProblems.has(currentProblemIndex);
+  const currentCode = codeByProblem[currentProblemIndex];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 112px)', minHeight: 600 }}>
-
-      {/* Progress bar */}
-      <div style={{ height: 3, background: 'var(--bg-tertiary)', marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
-        <div style={{
-          height: '100%', width: `${progressPercent}%`,
-          background: 'linear-gradient(90deg, var(--accent), #A78BFA)',
-          borderRadius: 'var(--radius-full)',
-          transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
-        }} />
-      </div>
-
-      {/* Top bar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: 'var(--space-3) var(--space-5)',
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-lg)',
-        marginBottom: 'var(--space-4)', flexShrink: 0,
-        gap: 'var(--space-4)',
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0D0E12', color: '#fff' }}>
+      {/* Top Nav (AlgoMaster style) */}
+      <div style={{ 
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+        height: 56, padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+        background: '#12141A'
       }}>
-        {/* Left: problem info */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', flexShrink: 0, whiteSpace: 'nowrap' }}>
-            Problem {currentProblemIndex + 1} / {totalProblems}
-          </span>
-          <div style={{ width: 1, height: 16, background: 'var(--border-subtle)', flexShrink: 0 }} />
-          <span style={{
-            fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 'var(--radius-full)', flexShrink: 0,
-            background: currentProblem.difficulty === 'Easy' ? 'var(--easy-subtle)' :
-              currentProblem.difficulty === 'Medium' ? 'var(--medium-subtle)' : 'var(--hard-subtle)',
-            color: currentProblem.difficulty === 'Easy' ? 'var(--easy)' :
-              currentProblem.difficulty === 'Medium' ? 'var(--medium)' : 'var(--hard)',
-          }}>
-            {currentProblem.difficulty}
-          </span>
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {currentProblem.title}
-          </span>
-          {isCurrentSubmitted && (
-            <span style={{
-              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 'var(--radius-full)',
-              background: 'var(--success-subtle)', color: 'var(--success)',
-              border: '1px solid rgba(16,185,129,0.2)', flexShrink: 0,
-            }}>Submitted</span>
-          )}
+        {/* Left: Logo & Problem nav */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 24, height: 24, borderRadius: 4, background: '#38BDF8' }} /> {/* Logo placeholder */}
+            <span style={{ fontWeight: 700, fontSize: 16 }}>AlgoMaster</span>
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.05)', borderRadius: 6, padding: '6px 12px' }}>
+            <span style={{ color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>&lt;</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#E2E8F0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>
+              {currentProblem.title}
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>&gt;</span>
+          </div>
         </div>
 
-        {/* Right: timer + actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexShrink: 0 }}>
-          <InterviewTimer seconds={timeRemainingSeconds} />
-
-          {/* Problem dots */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {session.problems.map((_, i) => (
-              <div key={i} style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: submittedProblems.has(i) ? 'var(--success)' :
-                  i === currentProblemIndex ? 'var(--accent)' : 'var(--border-default)',
-                transition: 'all 0.3s',
-                boxShadow: i === currentProblemIndex ? '0 0 6px var(--accent)' : 'none',
-              }} />
-            ))}
+        {/* Right: Timer, Progress, End Interview */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(0,0,0,0.3)', padding: '6px 16px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.05)' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: 6 }}>
+              ⏱ {Math.floor(timeRemainingSeconds / 60).toString().padStart(2, '0')}:{(timeRemainingSeconds % 60).toString().padStart(2, '0')}
+            </span>
+            <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
+              <div style={{ width: \`\${progressPercent}%\`, height: '100%', background: '#10B981', borderRadius: 2 }} />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>
+              {currentProblemIndex + 1} / {totalProblems}
+            </span>
           </div>
 
-          <button
+          <button 
             onClick={() => setShowEndConfirm(true)}
-            style={{
-              padding: '7px 14px', borderRadius: 'var(--radius-md)',
-              background: 'transparent', border: '1px solid var(--border-default)',
-              cursor: 'pointer', fontSize: 12, fontWeight: 500, color: 'var(--text-muted)',
-              transition: 'all var(--transition-fast)', whiteSpace: 'nowrap',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = 'var(--error)';
-              e.currentTarget.style.color = 'var(--error)';
-              e.currentTarget.style.background = 'var(--error-subtle)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = 'var(--border-default)';
-              e.currentTarget.style.color = 'var(--text-muted)';
-              e.currentTarget.style.background = 'transparent';
+            style={{ 
+              background: 'transparent', border: '1px solid rgba(239,68,68,0.5)', color: '#EF4444',
+              padding: '6px 16px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer'
             }}
           >
             End Interview
@@ -405,147 +353,176 @@ export function InterviewActive({
         </div>
       </div>
 
-      {/* Time up / ended banner */}
-      {phase === 'complete' && (
-        <div style={{
-          background: 'var(--warning-subtle)', border: '1px solid rgba(245,158,11,0.3)',
-          borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-5)',
-          marginBottom: 'var(--space-4)', fontSize: 14, color: 'var(--warning)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          flexShrink: 0,
-        }}>
-          <span style={{ fontWeight: 500 }}>
-            {timeRemainingSeconds === 0 ? "Time's up!" : "Interview ended."} Generate your performance report now.
-          </span>
-          <button
-            onClick={() => onEndInterview(transcript, codeByProblem, session.problems)}
-            style={{
-              padding: '7px 18px', background: 'var(--warning)', border: 'none',
-              borderRadius: 'var(--radius-md)', cursor: 'pointer',
-              fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap',
-            }}
-          >
-            Get My Report →
-          </button>
-        </div>
-      )}
-
-      {/* Main 3-column layout */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.1fr) 360px',
-        gap: 'var(--space-4)',
-        flex: 1,
-        minHeight: 0,
-      }}>
-        {/* Col 1: Problem + Test Results (tabbed) */}
-        <div style={{
-          display: 'flex', flexDirection: 'column',
-          background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-lg)', overflow: 'hidden', minHeight: 0,
-        }}>
-          {/* Tab bar */}
-          <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-tertiary)', flexShrink: 0 }}>
-            {[
-              { key: 'problem', label: 'Problem' },
-              { key: 'results', label: runResult ? `Results (${runResult.results.filter(r => r.passed).length}/${runResult.results.length})` : 'Test Results' },
-            ].map(tab => (
+      {/* Main Split Layout */}
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        <PanelGroup direction="horizontal">
+          
+          {/* LEFT PANE */}
+          <Panel defaultSize={40} minSize={25} style={{ background: '#161822', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 16px' }}>
               <button
-                key={tab.key}
-                onClick={() => setActiveLeftTab(tab.key as 'problem' | 'results')}
+                onClick={() => setActiveLeftTab('problem')}
                 style={{
-                  padding: '10px 16px', background: 'none', border: 'none',
-                  cursor: 'pointer', fontSize: 13, fontWeight: 500,
-                  color: activeLeftTab === tab.key ? 'var(--text-primary)' : 'var(--text-muted)',
-                  borderBottom: activeLeftTab === tab.key ? '2px solid var(--accent)' : '2px solid transparent',
-                  marginBottom: -1, transition: 'all var(--transition-fast)',
+                  background: 'transparent', border: 'none', padding: '16px', color: activeLeftTab === 'problem' ? '#E2E8F0' : 'rgba(255,255,255,0.4)',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: \`2px solid \${activeLeftTab === 'problem' ? '#10B981' : 'transparent'}\`,
+                  display: 'flex', alignItems: 'center', gap: 8
                 }}
               >
-                {tab.label}
+                📝 Problem
               </button>
-            ))}
-          </div>
+              <button
+                onClick={() => setActiveLeftTab('chat')}
+                style={{
+                  background: 'transparent', border: 'none', padding: '16px', color: activeLeftTab === 'chat' ? '#E2E8F0' : 'rgba(255,255,255,0.4)',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: \`2px solid \${activeLeftTab === 'chat' ? '#10B981' : 'transparent'}\`,
+                  display: 'flex', alignItems: 'center', gap: 8
+                }}
+              >
+                💬 Interview Chat
+              </button>
+            </div>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              {activeLeftTab === 'problem' ? (
+                <InterviewProblemPanel problem={currentProblem} />
+              ) : (
+                <div style={{ height: '100%', border: 'none', background: 'transparent' }}>
+                  <InterviewChat
+                    transcript={transcript}
+                    isAiTyping={isAiTyping}
+                    userInput={userInput}
+                    setUserInput={setUserInput}
+                    onSend={() => handleSend()}
+                    disabled={phase === 'complete' || isSending}
+                    chatEndRef={chatEndRef}
+                  />
+                </div>
+              )}
+            </div>
+          </Panel>
 
-          {/* Tab content */}
-          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-            {activeLeftTab === 'problem'
-              ? <InterviewProblemPanel problem={currentProblem} />
-              : <TestResultsPanel result={runResult} isLoading={isRunning} />
-            }
-          </div>
-        </div>
+          {/* DRAG HANDLE */}
+          <PanelResizeHandle style={{ width: 8, background: '#0D0E12', cursor: 'col-resize', position: 'relative' }}>
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 2, height: 20, background: 'rgba(255,255,255,0.2)', borderRadius: 2 }} />
+          </PanelResizeHandle>
 
-        {/* Col 2: Code editor */}
-        <InterviewCodeEditor
-          code={currentCode}
-          onChange={(val) => setCodeByProblem(prev => {
-            const next = [...prev];
-            next[currentProblemIndex] = val;
-            return next;
-          })}
-          onRun={handleRun}
-          onSubmit={handleSubmit}
-          isRunning={isRunning}
-          isSubmitting={isSubmitting}
-          isSubmitted={isCurrentSubmitted}
-          disabled={phase === 'complete'}
-        />
+          {/* RIGHT PANE */}
+          <Panel style={{ display: 'flex', flexDirection: 'column' }}>
+            <PanelGroup direction="vertical">
+              
+              {/* TOP: Code Editor */}
+              <Panel defaultSize={65} minSize={20} style={{ background: '#1E2029', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <InterviewCodeEditor
+                    code={currentCode}
+                    onChange={(val) => setCodeByProblem(prev => {
+                      const next = [...prev];
+                      next[currentProblemIndex] = val;
+                      return next;
+                    })}
+                    onRun={handleRun}
+                    onSubmit={handleSubmit}
+                    isRunning={isRunning}
+                    isSubmitting={isSubmitting}
+                    isSubmitted={isCurrentSubmitted}
+                    disabled={phase === 'complete'}
+                  />
+                </div>
+              </Panel>
 
-        {/* Col 3: Chat */}
-        <InterviewChat
-          transcript={transcript}
-          isAiTyping={isAiTyping}
-          userInput={userInput}
-          setUserInput={setUserInput}
-          onSend={() => handleSend()}
-          disabled={phase === 'complete' || isSending}
-          chatEndRef={chatEndRef}
-        />
+              {/* DRAG HANDLE */}
+              <PanelResizeHandle style={{ height: 8, background: '#0D0E12', cursor: 'row-resize', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 20, height: 2, background: 'rgba(255,255,255,0.2)', borderRadius: 2 }} />
+              </PanelResizeHandle>
+
+              {/* BOTTOM: Test Cases / Actions */}
+              <Panel minSize={20} style={{ background: '#161822', display: 'flex', flexDirection: 'column' }}>
+                {/* Actions & Tabs Bar */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', gap: 16 }}>
+                    <button
+                      onClick={() => setActiveBottomTab('testcases')}
+                      style={{ background: 'none', border: 'none', color: activeBottomTab === 'testcases' ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: \`2px solid \${activeBottomTab === 'testcases' ? '#10B981' : 'transparent'}\`, paddingBottom: 6 }}
+                    >
+                      ✓ Test Cases
+                    </button>
+                    <button
+                      onClick={() => setActiveBottomTab('results')}
+                      style={{ background: 'none', border: 'none', color: activeBottomTab === 'results' ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: \`2px solid \${activeBottomTab === 'results' ? '#10B981' : 'transparent'}\`, paddingBottom: 6 }}
+                    >
+                      ▷ Output
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#E2E8F0', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                      💡 Hint
+                    </button>
+                    <button style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#E2E8F0', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                      📋 Review
+                    </button>
+                    <button style={{ background: 'transparent', border: '1px solid rgba(245,158,11,0.5)', color: '#F59E0B', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                      📊 Evaluate
+                    </button>
+                    <button 
+                      onClick={handleRun}
+                      disabled={isRunning || phase === 'complete'}
+                      style={{ background: '#10B981', border: 'none', color: '#fff', padding: '6px 20px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: isRunning ? 'not-allowed' : 'pointer', opacity: isRunning ? 0.7 : 1 }}
+                    >
+                      {isRunning ? 'Running...' : '▶ Run'}
+                    </button>
+                    <button 
+                      onClick={handleSubmit}
+                      disabled={isSubmitting || phase === 'complete' || isCurrentSubmitted}
+                      style={{ background: '#3B82F6', border: 'none', color: '#fff', padding: '6px 20px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: isSubmitting ? 'not-allowed' : 'pointer', opacity: (isSubmitting || isCurrentSubmitted) ? 0.7 : 1 }}
+                    >
+                      {isSubmitting ? 'Submitting...' : isCurrentSubmitted ? 'Submitted' : '✈ Submit'}
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+                  {activeBottomTab === 'testcases' ? (
+                    <div>
+                      {/* Show test cases exactly like AlgoMaster */}
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                        {currentProblem.sampleTestCases?.map((_, i) => (
+                          <button key={i} style={{ background: i === 0 ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)', color: i === 0 ? '#10B981' : 'rgba(255,255,255,0.6)', border: \`1px solid \${i === 0 ? 'rgba(16,185,129,0.3)' : 'transparent'}\`, padding: '4px 12px', borderRadius: 4, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                            Case {i + 1}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>INPUT</div>
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)', fontFamily: 'monospace', fontSize: 13 }}>
+                          {currentProblem.sampleTestCases?.[0]?.input || ''}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>EXPECTED OUTPUT</div>
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)', fontFamily: 'monospace', fontSize: 13 }}>
+                          {currentProblem.sampleTestCases?.[0]?.expected || ''}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <TestResultsPanel result={runResult} isLoading={isRunning} />
+                  )}
+                </div>
+              </Panel>
+            </PanelGroup>
+          </Panel>
+        </PanelGroup>
       </div>
 
       {/* End confirm modal */}
       {showEndConfirm && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 9999, backdropFilter: 'blur(4px)',
-        }}>
-          <div style={{
-            background: 'var(--bg-secondary)', border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-xl)', padding: 'var(--space-8)',
-            maxWidth: 440, width: '90%', boxShadow: 'var(--shadow-lg)',
-          }}>
-            <h3 className="h3" style={{ marginBottom: 'var(--space-3)' }}>End interview?</h3>
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 'var(--space-2)' }}>
-              Problems completed: <strong style={{ color: 'var(--text-primary)' }}>{submittedProblems.size} / {totalProblems}</strong>
-            </p>
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 'var(--space-6)' }}>
-              Your performance report will be generated from all submitted code and conversation.
-            </p>
-            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-              <button
-                onClick={() => setShowEndConfirm(false)}
-                style={{
-                  flex: 1, padding: '11px', borderRadius: 'var(--radius-md)',
-                  background: 'var(--bg-tertiary)', border: '1px solid var(--border-default)',
-                  cursor: 'pointer', fontSize: 14, fontWeight: 500, color: 'var(--text-primary)',
-                }}
-              >
-                Continue
-              </button>
-              <button
-                onClick={() => {
-                  setShowEndConfirm(false);
-                  onEndInterview(transcript, codeByProblem, session.problems);
-                }}
-                style={{
-                  flex: 1, padding: '11px', borderRadius: 'var(--radius-md)',
-                  background: 'var(--error)', border: 'none',
-                  cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#fff',
-                }}
-              >
-                End & Get Report
-              </button>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: '#161822', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 32, maxWidth: 460, width: '90%' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#fff', marginBottom: 16 }}>End the Interview?</h3>
+            <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: 24 }}>You've completed {submittedProblems.size} of {totalProblems} problems. Generate report?</p>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button onClick={() => setShowEndConfirm(false)} style={{ flex: 1, padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 6, color: '#fff', border: 'none', cursor: 'pointer' }}>Keep Going</button>
+              <button onClick={() => { setShowEndConfirm(false); onEndInterview(transcript, codeByProblem, session.problems); }} style={{ flex: 1, padding: 12, background: '#EF4444', borderRadius: 6, color: '#fff', border: 'none', cursor: 'pointer' }}>End & Get Report</button>
             </div>
           </div>
         </div>

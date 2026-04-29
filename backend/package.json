@@ -17,7 +17,7 @@
   "author": "Shubham Mittal <shubhammittal0610@gmail.com>",
   "license": "Apache-2.0",
   "dependencies": {
-    "axios": "^1.7.9",
+    "axios": "^1.15.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

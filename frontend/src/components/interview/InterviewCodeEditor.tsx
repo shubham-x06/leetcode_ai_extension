@@ -58,35 +58,38 @@ export function InterviewCodeEditor({
     }
   };
 
-  const lineCount = (code || '').split('\n').length;
+  const lineCount = Math.max(1, (code || '').split('\n').length);
 
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
-      background: '#0A0A14', border: '1px solid var(--border-subtle)',
-      borderRadius: 'var(--radius-lg)', overflow: 'hidden', minHeight: 0,
+      background: '#0D0D16', border: '1px solid var(--border-subtle)',
+      borderRadius: 'var(--radius-xl)', overflow: 'hidden', minHeight: 0,
+      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
     }}>
       {/* Editor header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 12px',
-        background: '#111120', borderBottom: '1px solid rgba(255,255,255,0.06)',
-        flexShrink: 0, gap: 'var(--space-3)',
+        padding: '10px 16px',
+        background: '#151522', borderBottom: '1px solid rgba(255,255,255,0.08)',
+        flexShrink: 0, gap: 'var(--space-4)',
       }}>
         {/* macOS dots + language */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
             {['#FF5F57', '#FEBC2E', '#28C840'].map(c => (
-              <div key={c} style={{ width: 11, height: 11, borderRadius: '50%', background: c }} />
+              <div key={c} style={{ width: 12, height: 12, borderRadius: '50%', background: c, boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.2), inset 0 -1px 2px rgba(0,0,0,0.2)' }} />
             ))}
           </div>
+          <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)' }} />
           <select
             value={language}
             onChange={e => handleLangChange(e.target.value)}
             style={{
-              background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 6, padding: '3px 8px', color: '#E2E8F0', fontSize: 12,
-              cursor: 'pointer', outline: 'none',
+              background: 'transparent', border: 'none',
+              color: '#E2E8F0', fontSize: 13, fontWeight: 500,
+              cursor: 'pointer', outline: 'none', padding: 0,
+              appearance: 'none', fontFamily: 'var(--font-sans)'
             }}
           >
             {LANGUAGES.map(l => (
@@ -98,86 +101,26 @@ export function InterviewCodeEditor({
         </div>
 
         {/* Action buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           {/* Reset */}
           <button
             onClick={() => onChange(LANGUAGE_STARTERS[language] || '')}
             style={{
-              padding: '4px 10px', background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6,
-              cursor: 'pointer', fontSize: 11, color: 'rgba(255,255,255,0.4)',
-              transition: 'all 0.15s',
+              padding: '6px 12px', background: 'transparent',
+              border: 'none', borderRadius: 6,
+              cursor: 'pointer', fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.4)',
+              transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6
             }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; e.currentTarget.style.background = 'transparent'; }}
           >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+            </svg>
             Reset
           </button>
 
-          {/* Run button */}
-          <button
-            onClick={onRun}
-            disabled={isRunning || disabled || !code.trim()}
-            title="Run code against test cases (Ctrl+Enter)"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 14px', borderRadius: 6,
-              background: isRunning ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.2)',
-              border: '1px solid rgba(16,185,129,0.3)',
-              cursor: isRunning || disabled ? 'not-allowed' : 'pointer',
-              fontSize: 12, fontWeight: 600, color: '#10B981',
-              opacity: !code.trim() ? 0.4 : 1,
-              transition: 'all 0.15s',
-            }}
-          >
-            {isRunning ? (
-              <>
-                <div style={{
-                  width: 10, height: 10, borderRadius: '50%',
-                  border: '2px solid rgba(16,185,129,0.3)', borderTopColor: '#10B981',
-                  animation: 'spin 0.7s linear infinite',
-                }} />
-                Running...
-              </>
-            ) : (
-              <>
-                <svg width="10" height="12" viewBox="0 0 10 12" fill="#10B981">
-                  <path d="M0 0L10 6L0 12V0Z"/>
-                </svg>
-                Run
-              </>
-            )}
-          </button>
-
-          {/* Submit button */}
-          <button
-            onClick={onSubmit}
-            disabled={isSubmitting || disabled || !code.trim() || isSubmitted}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 14px', borderRadius: 6,
-              background: isSubmitted
-                ? 'rgba(16,185,129,0.15)'
-                : 'rgba(99,102,241,0.9)',
-              border: isSubmitted ? '1px solid rgba(16,185,129,0.3)' : 'none',
-              cursor: isSubmitting || disabled || !code.trim() || isSubmitted ? 'not-allowed' : 'pointer',
-              fontSize: 12, fontWeight: 600,
-              color: isSubmitted ? '#10B981' : '#fff',
-              opacity: !code.trim() ? 0.4 : 1,
-              transition: 'all 0.15s',
-            }}
-          >
-            {isSubmitting ? (
-              <>
-                <div style={{
-                  width: 10, height: 10, borderRadius: '50%',
-                  border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff',
-                  animation: 'spin 0.7s linear infinite',
-                }} />
-                Submitting...
-              </>
-            ) : isSubmitted ? '✓ Submitted' : 'Submit →'}
-          </button>
+          <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)' }} />
         </div>
       </div>
 
@@ -185,12 +128,12 @@ export function InterviewCodeEditor({
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative', minHeight: 0 }}>
         {/* Line numbers */}
         <div style={{
-          flexShrink: 0, width: 40, padding: '14px 6px 14px 0',
-          background: '#0A0A14',
+          flexShrink: 0, width: 44, padding: '16px 12px 16px 0',
+          background: 'rgba(0,0,0,0.15)',
           overflowY: 'hidden', userSelect: 'none',
-          fontFamily: "'Fira Code', 'Cascadia Code', monospace",
-          fontSize: 12, lineHeight: '22px',
-          color: 'rgba(255,255,255,0.2)', textAlign: 'right',
+          fontFamily: "'Fira Code', 'JetBrains Mono', monospace",
+          fontSize: 13, lineHeight: '24px',
+          color: 'rgba(255,255,255,0.15)', textAlign: 'right',
           borderRight: '1px solid rgba(255,255,255,0.05)',
         }}>
           {Array.from({ length: lineCount }, (_, i) => (
@@ -208,11 +151,11 @@ export function InterviewCodeEditor({
           autoCorrect="off"
           autoCapitalize="off"
           style={{
-            flex: 1, padding: '14px 16px',
-            background: '#0A0A14',
+            flex: 1, padding: '16px 16px',
+            background: 'transparent',
             color: '#E2E8F0', border: 'none', outline: 'none', resize: 'none',
-            fontFamily: "'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace",
-            fontSize: 13, lineHeight: '22px', letterSpacing: '0.02em',
+            fontFamily: "'Fira Code', 'JetBrains Mono', monospace",
+            fontSize: 13, lineHeight: '24px', letterSpacing: '0.02em',
             overflowY: 'auto', tabSize: 4,
             cursor: (disabled || isSubmitted) ? 'not-allowed' : 'text',
             opacity: (disabled || isSubmitted) ? 0.6 : 1,
@@ -224,14 +167,14 @@ export function InterviewCodeEditor({
       {/* Footer stats */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '5px 12px',
-        background: '#111120', borderTop: '1px solid rgba(255,255,255,0.05)',
+        padding: '6px 16px',
+        background: '#151522', borderTop: '1px solid rgba(255,255,255,0.05)',
         flexShrink: 0,
       }}>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace' }}>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontFamily: "'Fira Code', monospace" }}>
           {lineCount} lines · {code.length} chars
         </span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace' }}>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontFamily: "'Fira Code', monospace" }}>
           Ctrl+Enter to run
         </span>
       </div>
