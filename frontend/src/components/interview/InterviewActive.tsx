@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { sendMessage, runCode } from '../../api/interview';
 import type { InterviewSession, InterviewProblem, ChatMessage, InterviewPhase, RunResult } from '../../api/interview';
 import { InterviewTimer } from './InterviewTimer';
@@ -212,8 +212,8 @@ export function InterviewActive({
 
       setTimeout(() => {
         const statusMsg = result.allPassed
-          ? \`I ran my code against the test cases and all \${total}/\${total} passed. Time complexity: \${result.timeComplexity}, Space: \${result.spaceComplexity}.\`
-          : \`I ran my code against the test cases and \${passCount}/\${total} passed. I need to debug the failing cases.\`;
+          ? `I ran my code against the test cases and all ${total}/${total} passed. Time complexity: ${result.timeComplexity}, Space: ${result.spaceComplexity}.`
+          : `I ran my code against the test cases and ${passCount}/${total} passed. I need to debug the failing cases.`;
         handleSend(statusMsg);
       }, 500);
 
@@ -249,7 +249,7 @@ export function InterviewActive({
 
     const submitMsg: ChatMessage = {
       role: 'user',
-      content: \`I'm submitting my solution for Problem \${currentProblemIndex + 1}. Final code:\\n\\n\${code.slice(0, 800)}\`,
+      content: `I'm submitting my solution for Problem ${currentProblemIndex + 1}. Final code:\n\n${code.slice(0, 800)}`,
       timestamp: new Date().toISOString(),
     };
     const newTranscript = [...transcript, submitMsg];
@@ -334,7 +334,7 @@ export function InterviewActive({
               ⏱ {Math.floor(timeRemainingSeconds / 60).toString().padStart(2, '0')}:{(timeRemainingSeconds % 60).toString().padStart(2, '0')}
             </span>
             <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
-              <div style={{ width: \`\${progressPercent}%\`, height: '100%', background: '#10B981', borderRadius: 2 }} />
+              <div style={{ width: `${progressPercent}%`, height: '100%', background: '#10B981', borderRadius: 2 }} />
             </div>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>
               {currentProblemIndex + 1} / {totalProblems}
@@ -355,7 +355,7 @@ export function InterviewActive({
 
       {/* Main Split Layout */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
-        <PanelGroup direction="horizontal">
+        <PanelGroup orientation="horizontal">
           
           {/* LEFT PANE */}
           <Panel defaultSize={40} minSize={25} style={{ background: '#161822', display: 'flex', flexDirection: 'column' }}>
@@ -364,7 +364,7 @@ export function InterviewActive({
                 onClick={() => setActiveLeftTab('problem')}
                 style={{
                   background: 'transparent', border: 'none', padding: '16px', color: activeLeftTab === 'problem' ? '#E2E8F0' : 'rgba(255,255,255,0.4)',
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: \`2px solid \${activeLeftTab === 'problem' ? '#10B981' : 'transparent'}\`,
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: `2px solid ${activeLeftTab === 'problem' ? '#10B981' : 'transparent'}`,
                   display: 'flex', alignItems: 'center', gap: 8
                 }}
               >
@@ -374,7 +374,7 @@ export function InterviewActive({
                 onClick={() => setActiveLeftTab('chat')}
                 style={{
                   background: 'transparent', border: 'none', padding: '16px', color: activeLeftTab === 'chat' ? '#E2E8F0' : 'rgba(255,255,255,0.4)',
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: \`2px solid \${activeLeftTab === 'chat' ? '#10B981' : 'transparent'}\`,
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: `2px solid ${activeLeftTab === 'chat' ? '#10B981' : 'transparent'}`,
                   display: 'flex', alignItems: 'center', gap: 8
                 }}
               >
@@ -407,7 +407,7 @@ export function InterviewActive({
 
           {/* RIGHT PANE */}
           <Panel style={{ display: 'flex', flexDirection: 'column' }}>
-            <PanelGroup direction="vertical">
+            <PanelGroup orientation="vertical">
               
               {/* TOP: Code Editor */}
               <Panel defaultSize={65} minSize={20} style={{ background: '#1E2029', display: 'flex', flexDirection: 'column' }}>
@@ -441,13 +441,13 @@ export function InterviewActive({
                   <div style={{ display: 'flex', gap: 16 }}>
                     <button
                       onClick={() => setActiveBottomTab('testcases')}
-                      style={{ background: 'none', border: 'none', color: activeBottomTab === 'testcases' ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: \`2px solid \${activeBottomTab === 'testcases' ? '#10B981' : 'transparent'}\`, paddingBottom: 6 }}
+                      style={{ background: 'none', border: 'none', color: activeBottomTab === 'testcases' ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: `2px solid ${activeBottomTab === 'testcases' ? '#10B981' : 'transparent'}`, paddingBottom: 6 }}
                     >
                       ✓ Test Cases
                     </button>
                     <button
                       onClick={() => setActiveBottomTab('results')}
-                      style={{ background: 'none', border: 'none', color: activeBottomTab === 'results' ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: \`2px solid \${activeBottomTab === 'results' ? '#10B981' : 'transparent'}\`, paddingBottom: 6 }}
+                      style={{ background: 'none', border: 'none', color: activeBottomTab === 'results' ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: `2px solid ${activeBottomTab === 'results' ? '#10B981' : 'transparent'}`, paddingBottom: 6 }}
                     >
                       ▷ Output
                     </button>
@@ -486,7 +486,7 @@ export function InterviewActive({
                       {/* Show test cases exactly like AlgoMaster */}
                       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                         {currentProblem.sampleTestCases?.map((_, i) => (
-                          <button key={i} style={{ background: i === 0 ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)', color: i === 0 ? '#10B981' : 'rgba(255,255,255,0.6)', border: \`1px solid \${i === 0 ? 'rgba(16,185,129,0.3)' : 'transparent'}\`, padding: '4px 12px', borderRadius: 4, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                          <button key={i} style={{ background: i === 0 ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)', color: i === 0 ? '#10B981' : 'rgba(255,255,255,0.6)', border: `1px solid ${i === 0 ? 'rgba(16,185,129,0.3)' : 'transparent'}`, padding: '4px 12px', borderRadius: 4, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
                             Case {i + 1}
                           </button>
                         ))}
